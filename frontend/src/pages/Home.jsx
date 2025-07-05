@@ -11,7 +11,7 @@ const Home = () => {
     >
       <img
         className="w-20 ml-10"
-        src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Uber_logo_2018.svg/1024px-Uber_logo_2018.svg.png"
+        src="/assets/images/carbar-logo.png"
         alt="CarBar Logo"
       />
       <motion.div

@@ -12,12 +12,11 @@ import Chat from './pages/Chat';
 import BookRide from './pages/BookRide';
 import UserContext from './context/UserContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import { Toaster } from 'sonner'; // 🔥 Import sonner
+import { Toaster } from 'sonner';
 
 const App = () => {
   return (
     <UserContext>
-      {/* 🔔 Sonner Toast Notifications */}
       <Toaster richColors position="top-right" />
       
       <Routes>

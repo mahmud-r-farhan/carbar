@@ -69,7 +69,7 @@ const CaptainSignup = () => {
       <div>
         <img
           className="w-36 mb-3"
-          src="https://static.vecteezy.com/system/resources/previews/027/127/451/non_2x/uber-logo-uber-icon-transparent-free-png.png"
+          src="/assets/images/carbar-logo.png"
           alt="CarBar Logo"
         />
         {error && <p className="text-red-500 mb-4">{error}</p>}
