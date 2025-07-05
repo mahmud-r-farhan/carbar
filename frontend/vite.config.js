@@ -1,7 +1,58 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
-})
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      devOptions: {
+        enabled: true, 
+      },
+      includeAssets: ['/assets/images/logo.png'],
+      manifest: {
+        name: 'CarBar',
+        short_name: 'CarBar',
+        description: 'Affordable and reliable ride-sharing services.',
+        theme_color: '#2A4494',
+        background_color: '#F4A261',
+        display: 'standalone', 
+        start_url: '/',
+        icons: [
+          {
+            src: '/assets/images/logo.png', 
+            sizes: '192x192',
+            type: 'image/png',
+          },
+          {
+            src: '/assets/images/logo.png', 
+            sizes: '512x512',
+            type: 'image/png',
+          },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,png,jpg,jpeg}'],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/api\.cloudinary\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'cloudinary-images',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+              },
+            },
+          },
+        ],
+      },
+    }),
+  ],
+  server: {
+    host: true,
+    port: 5173,
+    open: true,
+  },
+});
