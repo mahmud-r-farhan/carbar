@@ -10,12 +10,12 @@ export default defineConfig({
       devOptions: {
         enabled: false,
       },
-      includeAssets: ['/assets/images/logo-192.png', '/assets/images/logo-512.png', '/assets/images/logo-maskable.png'],
+      includeAssets: ['/assets/images/logo.png', '/assets/images/logo.png', '/assets/images/logo.png'],
       manifest: {
         name: 'CarBar',
         short_name: 'CarBar',
         description: 'Affordable and reliable ride-sharing services.',
-        theme_color: '#2A4494',
+        theme_color: '#2A944',
         background_color: '#F4A261',
         display: 'standalone',
         start_url: '/',
@@ -40,7 +40,7 @@ export default defineConfig({
         gcm_sender_id: '103953800507',
       },
       workbox: {
-        globDirectory: 'dev-dist',
+        globDirectory: 'dist',
         globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff,woff2}'],
         globIgnores: ['**/node_modules/**/*', 'sw.js', 'workbox-*.js'],
         runtimeCaching: [
@@ -65,6 +65,15 @@ export default defineConfig({
     open: true,
   },
   build: {
-    outDir: 'dev-dist',
+    outDir: 'dist',
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'axios', 'framer-motion'],
+          ui: ['lucide-react', 'sonner'],
+        },
+      },
+    },
   },
 });
