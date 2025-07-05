@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -7,21 +7,38 @@ import axios from 'axios';
 
 const CaptainDashboard = () => {
   const [user, setUser] = useContext(UserDataContext);
+  const [trips, setTrips] = useState([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const dummyTrips = [
-    { id: 1, passenger: 'John Doe', from: 'Downtown', to: 'Airport', date: '2025-07-05', status: 'Accepted', earnings: 30 },
-    { id: 2, passenger: 'Jane Smith', from: 'Park Street', to: 'Mall', date: '2025-07-04', status: 'Pending', earnings: 20 },
-  ];
+  useEffect(() => {
+    const fetchTrips = async () => {
+      try {
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/captain/trips`, {
+          headers: { Authorization: `Bearer ${user.token}` },
+          withCredentials: true,
+        });
+        setTrips(response.data);
+      } catch (err) {
+        toast.error('Failed to fetch trips');
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (user.token) fetchTrips();
+  }, [user.token]);
 
   const handleLogout = async () => {
     try {
-      await axios.get(`${import.meta.env.VITE_API_URL}/captain/logout`, { withCredentials: true });
-      setUser({ email: '', fullname: { firstName: '', lastName: '' }, role: '', token: '' });
+      await axios.get(`${import.meta.env.VITE_API_URL}/captain/logout`, {
+        withCredentials: true,
+      });
+      setUser({ email: '', fullname: { firstName: '', lastName: '' }, role: '', token: '', verified: false, profileImage: '' });
+      localStorage.removeItem('user');
       navigate('/captain-login');
+      toast.success('Logged out successfully');
     } catch (err) {
-      const message = err.response?.data?.message;
-    toast.error(message);
+      toast.error(err.response?.data?.message || 'Logout failed');
     }
   };
 
@@ -29,44 +46,140 @@ const CaptainDashboard = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="p-7 h-screen flex flex-col"
+      transition={{ duration: 0.5 }}
+      className="p-8 min-h-screen bg-[#f7f7f7] font-sans text-gray-800"
     >
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Welcome, Captain {user.fullname.firstName}</h1>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={handleLogout}
-          className="bg-red-500 text-white px-4 py-2 rounded"
-        >
-          Logout
-        </motion.button>
-      </div>
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">Your Trips</h2>
-        {dummyTrips.map((trip) => (
-          <motion.div
-            key={trip.id}
-            initial={{ x: -50, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            className="bg-gray-100 p-4 rounded mb-3"
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-10">
+          <div className="flex items-center gap-5">
+            <img
+              src={user.profileImage || '/assets/images/avatar-placeholder.png'}
+              alt="Profile"
+              className="w-14 h-14 rounded-full object-cover border-4 border-blue-700"
+            />
+            <h1 className="text-3xl font-semibold">
+              Welcome, Captain {user.fullname.firstName}
+            </h1>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleLogout}
+            className="bg-[#111] text-white px-6 py-3 rounded-lg hover:bg-gray-900 transition"
           >
-            <p><strong>Passenger:</strong> {trip.passenger}</p>
-            <p><strong>From:</strong> {trip.from}</p>
-            <p><strong>To:</strong> {trip.to}</p>
-            <p><strong>Date:</strong> {trip.date}</p>
-            <p><strong>Status:</strong> {trip.status}</p>
-            <p><strong>Earnings:</strong> ${trip.earnings}</p>
-          </motion.div>
-        ))}
-      </div>
-      <div className="flex gap-4">
-        <Link to="/captain/map" className="bg-blue-500 text-white px-4 py-2 rounded">
-          View Map
-        </Link>
-        <Link to="/captain/chat" className="bg-green-500 text-white px-4 py-2 rounded">
-          Chat with Support
-        </Link>
+            Logout
+          </motion.button>
+        </div>
+
+        {/* Trip Summary */}
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="bg-white rounded-xl shadow-lg p-8 mb-10"
+        >
+          <h2 className="text-2xl font-semibold mb-6 border-b border-gray-200 pb-3">Trip Summary</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+            <div className="bg-[#eeeeee] rounded-lg p-6 text-center">
+              <p className="text-lg font-medium mb-2 text-blue-800">Total Trips</p>
+              <p className="text-4xl font-bold">{trips.length}</p>
+            </div>
+            <div className="bg-[#eeeeee] rounded-lg p-6 text-center">
+              <p className="text-lg font-medium mb-2 text-green-800">Total Earnings</p>
+              <p className="text-4xl font-bold">
+                ${trips.reduce((sum, trip) => sum + (trip.earnings || 0), 0)}
+              </p>
+            </div>
+            <div className="bg-[#eeeeee] rounded-lg p-6 text-center">
+              <p className="text-lg font-medium mb-2 text-yellow-800">Pending Trips</p>
+              <p className="text-4xl font-bold">
+                {trips.filter((trip) => trip.status === 'Pending').length}
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Trips Table */}
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="bg-white rounded-xl shadow-lg p-8"
+        >
+          <h2 className="text-2xl font-semibold mb-6 border-b border-gray-200 pb-3">Your Trips</h2>
+
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-blue-700"></div>
+            </div>
+          ) : trips.length === 0 ? (
+            <p className="text-gray-600 text-center py-16">No trips available.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="text-gray-700 border-b border-gray-300">
+                    <th className="py-4 px-6">Passenger</th>
+                    <th className="py-4 px-6">From</th>
+                    <th className="py-4 px-6">To</th>
+                    <th className="py-4 px-6">Date</th>
+                    <th className="py-4 px-6">Status</th>
+                    <th className="py-4 px-6">Earnings</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trips.map((trip) => (
+                    <motion.tr
+                      key={trip.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="border-b border-gray-200 hover:bg-[#f0f0f0]"
+                    >
+                      <td className="py-4 px-6">{trip.passenger}</td>
+                      <td className="py-4 px-6">{trip.from}</td>
+                      <td className="py-4 px-6">{trip.to}</td>
+                      <td className="py-4 px-6">{new Date(trip.date).toLocaleDateString()}</td>
+                      <td className="py-4 px-6">
+                        <span
+                          className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
+                            trip.status === 'Accepted'
+                              ? 'bg-green-200 text-green-800'
+                              : 'bg-yellow-200 text-yellow-800'
+                          }`}
+                        >
+                          {trip.status}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">${trip.earnings}</td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </motion.div>
+
+        {/* Navigation Buttons */}
+        <div className="flex gap-6 mt-10 justify-center">
+          <Link
+            to="/captain/map"
+            className="bg-[#111] text-white px-8 py-3 rounded-lg hover:bg-gray-900 transition text-lg font-medium"
+          >
+            View Map
+          </Link>
+          <Link
+            to="/captain/chat"
+            className="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 transition text-lg font-medium"
+          >
+            Chat with Support
+          </Link>
+          <Link
+            to="/captain/settings"
+            className="bg-gray-600 text-white px-8 py-3 rounded-lg hover:bg-gray-700 transition text-lg font-medium"
+          >
+            Settings
+          </Link>
+        </div>
       </div>
     </motion.div>
   );

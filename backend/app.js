@@ -11,7 +11,7 @@ const errorMiddleware = require('./middlewares/error.middleware');
 
 connectTODb();
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',');
 
 const corsOptions = {
   origin: function (origin, callback) {
