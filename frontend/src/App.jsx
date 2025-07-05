@@ -1,5 +1,5 @@
 import React, { useContext } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
 import UserLogin from './pages/UserLogin';
 import UserSignUp from './pages/UserSignUp';
@@ -19,7 +19,11 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 const AppLayout = () => {
   const [user] = useContext(UserDataContext);
-  const showBottomNav = user?.role === 'user' || user?.role === 'captain';
+  const location = useLocation();
+
+  // Hide bottom nav on Home page and show only if user is logged in and role is user or captain
+  const showBottomNav =
+    (user?.role === 'user' || user?.role === 'captain') && location.pathname !== '/';
 
   return (
     <div className={`min-h-screen flex flex-col ${showBottomNav ? 'pb-16' : ''}`}>
@@ -102,7 +106,7 @@ const AppLayout = () => {
           }
         />
       </Routes>
-      <BottomNav />
+      {showBottomNav && <BottomNav />}
     </div>
   );
 };
