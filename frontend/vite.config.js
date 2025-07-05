@@ -31,6 +31,7 @@ export default defineConfig({
             type: 'image/png',
           },
         ],
+        gcm_sender_id: "103953800507", // Required for push notifications
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,jpg,jpeg}'],

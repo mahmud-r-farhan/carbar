@@ -26,6 +26,8 @@ SMTP_PASS=your-app-specific-password
 CLOUDINARY_CLOUD_NAME=your-cloud-name
 CLOUDINARY_API_KEY=your-api-key
 CLOUDINARY_API_SECRET=your-api-secret
+VAPID_PUBLIC_KEY=
+VAPID_PUBLIC_KEY=
 
 ```
 
