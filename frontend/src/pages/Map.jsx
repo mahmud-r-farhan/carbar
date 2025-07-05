@@ -25,7 +25,7 @@ const Map = ({ role }) => {
       <MapContainer center={position} zoom={13} style={{ height: '80vh', width: '100%' }}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">CARBAR</a> contributors'
         />
         <Marker position={position}>
           <Popup>{role === 'captain' ? 'Your current location' : 'Pick-up location'}</Popup>

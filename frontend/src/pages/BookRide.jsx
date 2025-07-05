@@ -1,4 +1,5 @@
 import React, { useState, useContext } from 'react';
+import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import { UserDataContext } from '../context/UserContext';
@@ -14,13 +15,14 @@ const BookRide = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:3000/user/book-ride', { from, to }, {
+      await axios.post(`${import.meta.env.VITE_API_URL}/user/book-ride`, { from, to }, {
         headers: { Authorization: `Bearer ${user.token}` },
         withCredentials: true,
       });
       navigate('/user/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to book ride');
+      const message = err.response?.data?.message || 'Failed to book ride';
+    toast.error(message);
     }
   };
 

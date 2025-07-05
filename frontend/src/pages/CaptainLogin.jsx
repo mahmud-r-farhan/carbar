@@ -1,12 +1,15 @@
 import React, { useState, useContext } from 'react';
+import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import { UserDataContext } from '../context/UserContext';
+import { Eye, EyeOff } from 'lucide-react'; // Add icon library
 
 const CaptainLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false); // Toggle state
   const [error, setError] = useState('');
   const [, setUser] = useContext(UserDataContext);
   const navigate = useNavigate();
@@ -14,7 +17,7 @@ const CaptainLogin = () => {
   const submitHandler = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:3000/captain/login', {
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/captain/login`, {
         email,
         password,
       }, { withCredentials: true });
@@ -31,7 +34,9 @@ const CaptainLogin = () => {
       setPassword('');
       navigate('/captain/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      const message = err.response?.data?.message || 'Login failed';
+      toast.error(message);
+      setError(message);
     }
   };
 
@@ -59,17 +64,26 @@ const CaptainLogin = () => {
             placeholder="Type your email address"
           />
           <h3 className="text-xl mb-2">Enter Password</h3>
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="bg-[#eeeeee] mb-7 rounded px-4 border w-full text-lg h-11 placeholder:text-base"
-            type="password"
-            placeholder="Type your Password"
-          />
+          <div className="relative mb-7">
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="bg-[#eeeeee] rounded px-4 pr-11 border w-full text-lg h-11 placeholder:text-base"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Type your Password"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-800"
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          </div>
           <motion.button
             whileHover={{ scale: 1.05 }}
-            while Extent={{ scale: 0.95 }}
+            whileTap={{ scale: 0.95 }}
             className="bg-[#111] text-[#fff] mb-7 rounded px-4 border w-full h-11 text-lg"
             type="submit"
           >

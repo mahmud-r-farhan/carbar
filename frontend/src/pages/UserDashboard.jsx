@@ -1,4 +1,5 @@
 import React, { useContext } from 'react';
+import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { UserDataContext } from '../context/UserContext';
@@ -15,11 +16,12 @@ const UserDashboard = () => {
 
   const handleLogout = async () => {
     try {
-      await axios.get('http://localhost:3000/user/logout', { withCredentials: true });
+      await axios.get(`${import.meta.env.VITE_API_URL}/user/logout`, { withCredentials: true });
       setUser({ email: '', fullname: { firstName: '', lastName: '' }, role: '', token: '' });
       navigate('/login');
     } catch (err) {
-      console.error(err);
+      const message = err.response?.data?.message;
+    toast.error(message);
     }
   };
 

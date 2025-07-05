@@ -1,8 +1,10 @@
 import React, { useState, useContext } from 'react';
+import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import TermModal from '../components/TermModal';
+import { Eye, EyeOff } from 'lucide-react';
 import { UserDataContext } from '../context/UserContext';
 
 const CaptainSignup = () => {
@@ -10,6 +12,7 @@ const CaptainSignup = () => {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [vehicleColor, setVehicleColor] = useState('');
   const [vehiclePlate, setVehiclePlate] = useState('');
   const [vehicleCapacity, setVehicleCapacity] = useState('');
@@ -21,7 +24,7 @@ const CaptainSignup = () => {
   const submitHandler = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:3000/captain/register', {
+      const response = await axios.post( `${import.meta.env.VITE_API_URL}/captain/register`, {
         fullname: { firstname: firstName, lastname: lastName },
         email,
         password,
@@ -51,7 +54,9 @@ const CaptainSignup = () => {
       setVehicleType('');
       navigate('/captain/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
+       const message = err.response?.data?.message || 'Registration failed';
+    toast.error(message);
+    setError(message);
     }
   };
 
@@ -101,14 +106,23 @@ const CaptainSignup = () => {
             placeholder="Email address"
           />
           <h3 className="text-xl mb-2">Enter Password</h3>
+          <div className="relative mb-6">
           <input
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="bg-[#eeeeee] mb-6 rounded px-4 border w-full text-base h-11 placeholder:text-sm"
-            type="password"
+            className="bg-[#eeeeee] rounded px-4 pr-11 border w-full text-base h-11 placeholder:text-sm"
+            type={showPassword ? 'text' : 'password'}
             placeholder="Set Password"
           />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-800"
+          >
+            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+          </button>
+        </div>
           <h3 className="text-xl mb-2">Vehicle Details</h3>
           <input
             value={vehicleColor}

@@ -1,4 +1,5 @@
 import React, { useContext } from 'react';
+import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { UserDataContext } from '../context/UserContext';
@@ -15,11 +16,12 @@ const CaptainDashboard = () => {
 
   const handleLogout = async () => {
     try {
-      await axios.get('http://localhost:3000/captain/logout', { withCredentials: true });
+      await axios.get(`${import.meta.env.VITE_API_URL}/captain/logout`, { withCredentials: true });
       setUser({ email: '', fullname: { firstName: '', lastName: '' }, role: '', token: '' });
       navigate('/captain-login');
     } catch (err) {
-      console.error(err);
+      const message = err.response?.data?.message;
+    toast.error(message);
     }
   };
 

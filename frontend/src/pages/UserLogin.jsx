@@ -1,4 +1,6 @@
 import React, { useState, useContext } from 'react';
+import { toast } from 'sonner';
+import { Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion } from 'framer-motion';
@@ -7,6 +9,7 @@ import { UserDataContext } from '../context/UserContext';
 const UserLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [, setUser] = useContext(UserDataContext);
   const navigate = useNavigate();
@@ -14,7 +17,7 @@ const UserLogin = () => {
   const submitHandler = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:3000/user/login', {
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/user/login`, {
         email,
         password,
       }, { withCredentials: true });
@@ -31,7 +34,9 @@ const UserLogin = () => {
       setPassword('');
       navigate('/user/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      const message = err.response?.data?.message || 'Login failed';
+    toast.error(message);
+    setError(message);
     }
   };
 
@@ -59,14 +64,23 @@ const UserLogin = () => {
             placeholder="Type your email address"
           />
           <h3 className="text-xl mb-2">Enter Password</h3>
+          <div className="relative mb-6">
           <input
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="bg-[#eeeeee] mb-7 rounded px-4 border w-full text-lg h-11 placeholder:text-base"
-            type="password"
-            placeholder="Type your Password"
+            className="bg-[#eeeeee] rounded px-4 pr-11 border w-full text-base h-11 placeholder:text-sm"
+            type={showPassword ? 'text' : 'password'}
+            placeholder="Set Password"
           />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-800"
+          >
+            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+          </button>
+        </div>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
