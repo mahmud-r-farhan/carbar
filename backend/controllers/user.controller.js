@@ -17,14 +17,29 @@ module.exports.registerUser = async (req, res, next) => {
 
     const { fullname, email, password } = req.body;
 
-    const isUserAlreadyExist = await userModel.findOne({ email });
-    if (isUserAlreadyExist) {
-      return res.status(400).json({ message: 'User already exists' });
+    const existingUser = await userModel.findOne({ email });
+
+    if (existingUser) {
+      if (!existingUser.verified) {
+        const otp = generateOTP();
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiration
+
+        existingUser.verificationCode = { code: otp, expiresAt };
+        await existingUser.save();
+        await sendOTPEmail(email, otp);
+
+        return res.status(200).json({
+          message: 'You already registered but not verified. OTP resent to your email.',
+          userId: existingUser._id.toString(),
+        });
+      } else {
+        return res.status(400).json({ message: 'User already exists' });
+      }
     }
 
     const hashedPassword = await userModel.hashPassword(password);
     const otp = generateOTP();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     const user = await userService.createUser({
       firstname: fullname.firstname,

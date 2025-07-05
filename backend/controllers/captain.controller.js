@@ -17,14 +17,30 @@ module.exports.registerCaptain = async (req, res, next) => {
 
     const { fullname, email, password, vehicle } = req.body;
 
-    const isCaptainAlreadyExist = await captainModel.findOne({ email });
-    if (isCaptainAlreadyExist) {
-      return res.status(400).json({ message: 'Captain already exists' });
+    const existingCaptain = await captainModel.findOne({ email });
+
+    if (existingCaptain) {
+      if (!existingCaptain.verified) {
+        const otp = generateOTP();
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+        existingCaptain.verificationCode = { code: otp, expiresAt };
+        await existingCaptain.save();
+        await sendOTPEmail(email, otp);
+
+        return res.status(200).json({
+          message: 'You already registered but not verified. OTP resent to your email.',
+          captainId: existingCaptain._id.toString(),
+        });
+      } else {
+        return res.status(400).json({ message: 'Captain already exists' });
+      }
     }
 
+  
     const hashedPassword = await captainModel.hashPassword(password);
     const otp = generateOTP();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiration
 
     const captain = await captainService.createCaptain({
       firstname: fullname.firstname,
