@@ -48,27 +48,33 @@ module.exports.registerCaptain = async (req, res, next) => {
 module.exports.verifyCaptainOTP = async (req, res, next) => {
   try {
     const { captainId, otp } = req.body;
-    const sanitizedOtp = otp.trim(); // Remove any whitespace
+    const sanitizedOtp = String(otp).trim();
+
     console.log('Verifying OTP for captainId:', captainId, 'OTP:', sanitizedOtp);
 
     const captain = await captainModel.findById(captainId);
-    if (!captain || !captain.verificationCode) {
-      console.log('Invalid captainId or no verification code:', captainId);
-      return res.status(400).json({ message: 'Invalid request' });
+    if (!captain) {
+      console.log('Captain not found for ID:', captainId);
+      return res.status(400).json({ message: 'Captain not found' });
+    }
+    if (!captain.verificationCode) {
+      console.log('No verification code for captainId:', captainId);
+      return res.status(400).json({ message: 'No OTP associated with this account' });
     }
 
     console.log('Stored OTP:', captain.verificationCode.code, 'Expires At:', captain.verificationCode.expiresAt);
 
-    if (
-      captain.verificationCode.code !== sanitizedOtp ||
-      captain.verificationCode.expiresAt < new Date()
-    ) {
-      console.log('OTP mismatch or expired:', {
+    if (captain.verificationCode.expiresAt < new Date()) {
+      console.log('OTP expired for captainId:', captainId);
+      return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
+    }
+
+    if (String(captain.verificationCode.code).trim() !== sanitizedOtp) {
+      console.log('OTP mismatch:', {
         stored: captain.verificationCode.code,
         provided: sanitizedOtp,
-        expired: captain.verificationCode.expiresAt < new Date(),
       });
-      return res.status(400).json({ message: 'Invalid or expired OTP' });
+      return res.status(400).json({ message: 'Invalid OTP' });
     }
 
     captain.verified = true;
