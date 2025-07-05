@@ -1,10 +1,83 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
+    <!-- Basic Meta Tags -->
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
+    <meta name="description" content="CarBar - Affordable and reliable ride-sharing services. Book a ride or become a captain with CarBar for seamless transportation in your city." />
+    <meta name="keywords" content="ride-sharing, CarBar, book a ride, become a driver, transportation, taxi service, local rides" />
+    <meta name="author" content="CarBar by Mahmud" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Title -->
+    <title>CarBar - Ride-Sharing & Transportation Services</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/assets/images/logo.png" />
+
+    <!-- Open Graph (OG) Tags for Social Media -->
+    <meta property="og:title" content="CarBar - Ride-Sharing & Transportation Services" />
+    <meta property="og:description" content="Join CarBar for affordable rides or become a captain. Enjoy seamless transportation in your city with our reliable service." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://carbar-pi.vercel.app" />
+    <meta property="og:image" content="https://res.cloudinary.com/dqovjmmlx/image/upload/v1751691913/banner_apbdkb.png" />
+    <meta property="og:image:alt" content="CarBar Logo" />
+    <meta property="og:site_name" content="CarBar" />
+
+    <!-- Twitter Card Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CarBar - Ride-Sharing & Transportation Services" />
+    <meta name="twitter:description" content="Book a ride or drive with CarBar. Affordable and reliable transportation services for everyone." />
+    <meta name="twitter:image" content="https://res.cloudinary.com/dqovjmmlx/image/upload/v1751691913/banner_apbdkb.png" />
+    <meta name="twitter:image:alt" content="CarBar Logo" />
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://carbar-pi.vercel.app" />
+
+    <!-- Structured Data (JSON-LD) for Organization -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "CarBar",
+        "url": "https://carbar-pi.vercel.app",
+        "logo": "https://res.cloudinary.com/dqovjmmlx/image/upload/v1751688877/carbar_tvqrti.png",
+        "description": "CarBar provides affordable and reliable ride-sharing services for passengers and opportunities for drivers to earn with flexible schedules.",
+        "sameAs": [
+          "https://facebook.com/safezone74"
+        ],
+        "contactPoint": {
+          "@type": "ContactPoint",
+          "email": "dev@devplus.fun",
+          "contactType": "Customer Service"
+        }
+      }
+    </script>
+
+    <!-- Structured Data (JSON-LD) for WebSite -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "CarBar",
+        "url": "https://carbar-pi.vercel.app",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://carbar-pi.vercel.app/search?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
+
+    <!-- Preload Critical Assets -->
+    <link rel="preload" href="/assets/images/carbar.png" as="image" />
+
+    <!-- Preconnect to External Resources -->
+    <link rel="preconnect" href="https://api.cloudinary.com" />
+    <link rel="preconnect" href="https://smtp.gmail.com" />
+
+    <!-- Alternate Languages (if applicable) -->
+    <link rel="alternate" hreflang="en" href="https://carbar-pi.vercel.app" />
   </head>
   <body>
     <div id="root"></div>

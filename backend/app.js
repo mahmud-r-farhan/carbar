@@ -30,7 +30,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.get('/', (req, res) => {
-  res.send('CarBar API');
+  res.send('CarBar API, Visit: https://carbar-pi.vercel.app/');
 });
 
 app.use('/user', userRoutes);
