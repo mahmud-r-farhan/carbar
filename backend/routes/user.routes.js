@@ -35,7 +35,7 @@ router.post(
 
 router.get('/rides', authMiddleware.authUser, userController.getUserRides);
 
-router.get('/logout', authMiddleware.authUser, userController.logoutUser);
+router.post('/user/logout', authMiddleware.authUser, userController.logoutUser);
 
 router.post(
   '/book-ride',

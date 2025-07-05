@@ -71,30 +71,29 @@ const Settings = ({ role = 'user' }) => {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 40 }}
+      initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-8 min-h-screen bg-[#f7f7f7] flex flex-col items-center font-sans text-gray-800"
+      transition={{ duration: 0.3 }}
+      className="min-h-screen p-4 bg-gray-50 text-gray-800 flex flex-col items-center"
     >
-      <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
-        <h2 className="text-3xl font-semibold mb-8 text-center">Profile Settings</h2>
+      <div className="w-full max-w-md bg-white border rounded-md p-6">
+        <h2 className="text-xl font-semibold mb-6 text-center">Edit Profile</h2>
+
         {error && (
-          <p className="text-red-600 bg-red-100 rounded-xl p-3 mb-6 text-center font-medium">
-            {error}
-          </p>
+          <p className="text-sm text-red-600 bg-red-100 p-3 rounded mb-5 text-center">{error}</p>
         )}
-        <form onSubmit={handleSave} className="flex flex-col gap-6">
+
+        <form onSubmit={handleSave} className="space-y-5">
           <div className="flex flex-col items-center">
-            <motion.img
+            <img
               src={
                 profileImage ||
                 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png?20150327203541'
               }
               alt="Profile"
-              className="w-28 h-28 rounded-full object-cover mb-4 border-4 border-blue-500 shadow-md"
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
+              className="w-24 h-24 rounded-full object-cover border"
             />
-            <label className="cursor-pointer text-blue-600 font-medium hover:underline">
+            <label className="text-blue-600 text-sm mt-2 cursor-pointer hover:underline">
               {uploading ? 'Uploading...' : 'Change Photo'}
               <input
                 type="file"
@@ -105,38 +104,41 @@ const Settings = ({ role = 'user' }) => {
               />
             </label>
           </div>
+
           <div>
-            <label className="block text-gray-700 mb-2 font-semibold">First Name</label>
+            <label className="block text-sm mb-1">First Name</label>
             <input
-              className="w-full px-5 py-3 border rounded-xl focus:outline-none focus:ring-3 focus:ring-blue-500 bg-gray-100 text-lg"
               type="text"
               placeholder="First name"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               required
+              className="w-full px-4 py-2 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               spellCheck={false}
               autoComplete="given-name"
             />
           </div>
+
           <div>
-            <label className="block text-gray-700 mb-2 font-semibold">Last Name</label>
+            <label className="block text-sm mb-1">Last Name</label>
             <input
-              className="w-full px-5 py-3 border rounded-xl focus:outline-none focus:ring-3 focus:ring-blue-500 bg-gray-100 text-lg"
               type="text"
               placeholder="Last name"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               required
+              className="w-full px-4 py-2 border rounded bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               spellCheck={false}
               autoComplete="family-name"
             />
           </div>
+
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700 transition"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             type="submit"
             disabled={uploading}
+            className="w-full py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition"
           >
             Save Changes
           </motion.button>

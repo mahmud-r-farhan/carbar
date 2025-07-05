@@ -41,44 +41,49 @@ const BookRide = () => {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 50 }}
+      initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-6 min-h-screen bg-gray-50 flex flex-col justify-center"
+      className="min-h-screen bg-gray-50 flex items-center justify-center p-4"
     >
-      <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">Book a Ride</h2>
+      <div className="w-full max-w-md bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+        <h2 className="text-xl font-semibold text-center mb-5 text-gray-800">Book a Ride</h2>
+        
         {error && (
-          <p className="text-red-500 text-center mb-4 bg-red-100 p-2 rounded">{error}</p>
+          <p className="text-sm text-red-600 bg-red-100 border border-red-200 rounded p-2 mb-4 text-center">
+            {error}
+          </p>
         )}
+        
         <form onSubmit={submitHandler} className="space-y-4">
           <div>
-            <label className="block text-gray-700 mb-1">Pickup Location</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Pickup Location</label>
             <input
               value={from}
               onChange={(e) => setFrom(e.target.value)}
               required
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100"
+              className="w-full px-4 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 text-sm"
               type="text"
-              placeholder="Enter pickup location"
+              placeholder="e.g. Dhanmondi, Dhaka"
             />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Destination</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Destination</label>
             <input
               value={to}
               onChange={(e) => setTo(e.target.value)}
               required
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100"
+              className="w-full px-4 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 text-sm"
               type="text"
-              placeholder="Enter destination"
+              placeholder="e.g. Banani, Dhaka"
             />
           </div>
+
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 disabled:bg-blue-300"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             type="submit"
             disabled={loading}
+            className="w-full bg-blue-600 text-white py-2 rounded-md text-sm font-semibold hover:bg-blue-700 disabled:bg-blue-400 transition"
           >
             {loading ? 'Booking...' : 'Book Ride'}
           </motion.button>

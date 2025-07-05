@@ -136,13 +136,25 @@ module.exports.updateUserProfile = async (req, res, next) => {
 
 module.exports.logoutUser = async (req, res, next) => {
   try {
-    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-    if (token) {
-      await blackListTokenModel.create({ token });
+    const token = req.headers.authorization?.split(' ')[1] || req.cookies.token;
+    if (!token) {
+      return res.status(400).json({ message: 'No token provided' });
     }
-    res.clearCookie('token');
-    res.status(200).json({ message: 'Logged out' });
+
+    await BlacklistToken.create({ token });
+
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    });
+
+    return res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
+    console.error('Logout error:', error);
+    if (error.code === 110) { // Handle duplicate token
+      return res.status(200).json({ message: 'Logged out successfully' });
+    }
     next(error);
   }
 };

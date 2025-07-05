@@ -8,33 +8,41 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: {
-        enabled: true, 
+        enabled: false,
       },
-      includeAssets: ['/assets/images/logo.png'],
+      includeAssets: ['/assets/images/logo-192.png', '/assets/images/logo-512.png', '/assets/images/logo-maskable.png'],
       manifest: {
         name: 'CarBar',
         short_name: 'CarBar',
         description: 'Affordable and reliable ride-sharing services.',
         theme_color: '#2A4494',
         background_color: '#F4A261',
-        display: 'standalone', 
+        display: 'standalone',
         start_url: '/',
         icons: [
           {
-            src: '/assets/images/logo.png', 
+            src: '/assets/images/logo.png',
             sizes: '192x192',
             type: 'image/png',
           },
           {
-            src: '/assets/images/logo.png', 
+            src: '/assets/images/logo.png',
             sizes: '512x512',
             type: 'image/png',
           },
+          {
+            src: '/assets/images/logo.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
         ],
-        gcm_sender_id: "103953800507", // Required for push notifications
+        gcm_sender_id: '103953800507',
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,jpg,jpeg}'],
+        globDirectory: 'dev-dist',
+        globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff,woff2}'],
+        globIgnores: ['**/node_modules/**/*', 'sw.js', 'workbox-*.js'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/api\.cloudinary\.com\/.*/i,
@@ -55,5 +63,8 @@ export default defineConfig({
     host: true,
     port: 5173,
     open: true,
+  },
+  build: {
+    outDir: 'dev-dist',
   },
 });

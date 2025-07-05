@@ -35,18 +35,20 @@ const Chat = ({ role }) => {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 50 }}
+      initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-8 min-h-screen bg-[#f7f7f7] flex flex-col font-sans text-gray-800"
+      transition={{ duration: 0.3 }}
+      className="p-4 min-h-screen bg-gray-50 text-gray-800 flex flex-col"
     >
-      <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg flex flex-col h-[80vh]">
-        <h2 className="text-2xl font-semibold p-5 border-b border-gray-200">
+      <div className="w-full max-w-3xl mx-auto border rounded-md bg-white flex flex-col h-[80vh]">
+        <div className="text-base font-medium px-4 py-3 border-b bg-white">
           {role === 'captain' ? 'Captain Support Chat' : 'User Support Chat'}
-        </h2>
-        <div className="flex-1 p-6 overflow-y-auto space-y-5">
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
           {loading ? (
             <div className="flex justify-center items-center h-full">
-              <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-blue-700"></div>
+              <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
             </div>
           ) : messages.length === 0 ? (
             <p className="text-gray-500 text-center">No messages yet.</p>
@@ -54,43 +56,44 @@ const Chat = ({ role }) => {
             messages.map((msg) => (
               <motion.div
                 key={msg.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
                 className={`flex ${msg.sender === user.fullname.firstName ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-xs p-4 rounded-2xl shadow-sm ${
+                  className={`max-w-xs px-4 py-3 rounded-md border ${
                     msg.sender === user.fullname.firstName
-                      ? 'bg-blue-600 text-white rounded-br-none'
-                      : 'bg-gray-100 text-gray-900 rounded-bl-none'
+                      ? 'bg-blue-100 text-blue-900 border-blue-200'
+                      : 'bg-gray-100 text-gray-800 border-gray-200'
                   }`}
                 >
-                  <p className="font-semibold mb-1">{msg.sender}</p>
-                  <p className="whitespace-pre-wrap">{msg.text}</p>
-                  <p className="text-xs mt-2 opacity-60 text-right">
+                  <div className="font-semibold mb-1">{msg.sender}</div>
+                  <div>{msg.text}</div>
+                  <div className="text-[11px] text-right text-gray-500 mt-2">
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
+                  </div>
                 </div>
               </motion.div>
             ))
           )}
         </div>
 
-        <form onSubmit={handleSendMessage} className="p-6 border-t border-gray-200 bg-[#fafafa] rounded-b-xl">
-          <div className="flex gap-4">
+        <form onSubmit={handleSendMessage} className="border-t bg-gray-50 p-3">
+          <div className="flex gap-3">
             <input
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              className="flex-1 px-5 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white text-gray-900 placeholder-gray-400"
               type="text"
-              placeholder="Type your message..."
+              placeholder="Type a message..."
+              className="flex-1 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               autoComplete="off"
             />
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               type="submit"
-              className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-semibold transition"
+              className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
             >
               Send
             </motion.button>
