@@ -248,12 +248,12 @@ const CaptainSignup = () => {
               type="submit"
               disabled={loading}
             >
-              {loading ? 'Submitting...' : 'Sign Up'}
+              {loading ? 'Sending OTP' : 'Create Account'}
             </motion.button>
             <p>
               Already have an account?{' '}
-              <Link to="/captain-login" className="text-green-500 hover:text-green-600">
-                Login
+              <Link to="/captain-login" className="text-orange-500 hover:text-green-600">
+                Captain Login
               </Link>
             </p>
           </form>

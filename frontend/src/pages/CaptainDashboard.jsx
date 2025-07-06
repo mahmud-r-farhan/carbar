@@ -4,12 +4,16 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { UserDataContext } from '../context/UserContext';
 import axios from 'axios';
+import useWebSocket from '../hooks/useWebSocket';
 
 const CaptainDashboard = () => {
   const [user, setUser] = useContext(UserDataContext);
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState('inactive');
+  const [notifications, setNotifications] = useState([]);
   const navigate = useNavigate();
+  const { socket } = useWebSocket();
 
   useEffect(() => {
     const fetchTrips = async () => {
@@ -28,6 +32,21 @@ const CaptainDashboard = () => {
     if (user.token) fetchTrips();
   }, [user.token]);
 
+  useEffect(() => {
+    if (socket) {
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'new_trip_request') {
+          setNotifications((prev) => [
+            ...prev,
+            { type: 'new_trip_request', message: 'New ride request received!', trip: data.data }
+          ]);
+          toast.info('New ride request received!');
+        }
+      };
+    }
+  }, [socket]);
+
   const handleLogout = async () => {
     try {
       await axios.get(`${import.meta.env.VITE_API_URL}/captain/logout`, {
@@ -39,6 +58,14 @@ const CaptainDashboard = () => {
       toast.success('Logged out successfully');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Logout failed');
+    }
+  };
+
+  const toggleStatus = () => {
+    const newStatus = status === 'active' ? 'inactive' : 'active';
+    setStatus(newStatus);
+    if (socket && socket.readyState === 1) {
+      socket.send(JSON.stringify({ type: 'status_update', data: { status: newStatus } }));
     }
   };
 
@@ -71,6 +98,25 @@ const CaptainDashboard = () => {
             Logout
           </motion.button>
         </div>
+
+        {/* Status and Notifications */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={toggleStatus}
+            className={`px-4 py-2 rounded ${status === 'active' ? 'bg-green-600 text-white' : 'bg-gray-400 text-white'}`}
+          >
+            {status === 'active' ? 'Go Offline' : 'Go Online'}
+          </button>
+        </div>
+        {notifications.length > 0 && (
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4 rounded">
+            <ul>
+              {notifications.map((n, idx) => (
+                <li key={idx} className="text-blue-800">{n.message}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Trip Summary */}
         <motion.div

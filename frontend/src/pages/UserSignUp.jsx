@@ -121,7 +121,7 @@ const UserSignUp = () => {
     <motion.div
       initial={{ opacity: 0, y: 50 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-7 h-screen flex flex-col justify-between"
+      className="p-7 h-screen flex flex-col justify-between bg-white"
     >
       <div>
         <img
@@ -191,7 +191,7 @@ const UserSignUp = () => {
             </form>
             <p>
               Already have an account?{' '}
-              <Link to="/login" className="text-blue-500 hover:text-blue-600">
+              <Link to="/login" className="text-orange-500 hover:text-blue-600">
                 Login
               </Link>
             </p>

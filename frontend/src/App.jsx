@@ -16,6 +16,7 @@ import { Toaster } from 'sonner';
 import BottomNav from './components/BottomNav';
 import Settings from './pages/Settings';
 import ErrorBoundary from './components/ErrorBoundary';
+import NotFound from './pages/NotFound';
 
 const AppLayout = () => {
   const [user] = useContext(UserDataContext);
@@ -33,6 +34,7 @@ const AppLayout = () => {
         <Route path="/signup" element={<UserSignUp />} />
         <Route path="/captain-login" element={<CaptainLogin />} />
         <Route path="/captain-signup" element={<CaptainSignup />} />
+        <Route path="*" element={<NotFound />} />
         <Route
           path="/user/dashboard"
           element={
@@ -108,6 +110,7 @@ const AppLayout = () => {
       </Routes>
       {showBottomNav && <BottomNav />}
     </div>
+    
   );
 };
 

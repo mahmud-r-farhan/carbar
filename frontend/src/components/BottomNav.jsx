@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, User, MessageCircle, Settings } from 'lucide-react';
+import { Home, User, MessageCircle, Bell, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { UserDataContext } from '../context/UserContext';
 
@@ -11,6 +11,8 @@ const navItems = [
   { to: '/captain/dashboard', icon: <User className="w-7 h-7" />, label: 'Dashboard', roles: ['captain'] },
   { to: '/user/chat', icon: <MessageCircle className="w-7 h-7" />, label: 'Chat', roles: ['user'] },
   { to: '/captain/chat', icon: <MessageCircle className="w-7 h-7" />, label: 'Chat', roles: ['captain'] },
+ // { to: '/user/notification', icon: <Bell className="w-7 h-7" />, label: 'Notification', roles: ['user'] },
+ // { to: '/captain/notification', icon: <Bell className="w-7 h-7" />, label: 'Notification', roles: ['captain'] },
   { to: '/settings', icon: <Settings className="w-7 h-7" />, label: 'Settings', roles: ['user'] },
   { to: '/captain/settings', icon: <Settings className="w-7 h-7" />, label: 'Settings', roles: ['captain'] },
 ];
@@ -22,6 +24,7 @@ const BottomNav = () => {
 
   const shouldShow = role === 'user' || role === 'captain';
 
+  // Filter nav items to show only those matching the user's role, avoiding duplicates
   const filteredNavItems = navItems.filter(
     (item, idx, arr) =>
       item.roles.includes(role) &&
@@ -56,7 +59,8 @@ const BottomNav = () => {
               >
                 {item.icon}
               </motion.div>
-          {/*    <span className="text-xs">{item.label}</span> */}
+              {/* Uncomment to show labels for better UX */}
+              <span className="text-xs">{item.label}</span>
             </NavLink>
           ))}
         </nav>

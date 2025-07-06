@@ -4,12 +4,15 @@ import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserDataContext } from '../context/UserContext';
 import axios from 'axios';
+import useWebSocket from '../hooks/useWebSocket';
 
 const UserDashboard = () => {
   const [user, setUser] = useContext(UserDataContext);
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
   const navigate = useNavigate();
+  const { socket } = useWebSocket();
 
   useEffect(() => {
     const fetchRides = async () => {
@@ -27,6 +30,22 @@ const UserDashboard = () => {
     };
     if (user.token) fetchRides();
   }, [user.token]);
+
+  useEffect(() => {
+    if (socket) {
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'trip_accepted') {
+          setNotifications((prev) => [
+            ...prev,
+            { type: 'trip_accepted', message: 'A captain accepted your ride!', trip: data.data }
+          ]);
+          toast.success('A captain accepted your ride!');
+        }
+        // Add more notification types as needed
+      };
+    }
+  }, [socket]);
 
   const handleLogout = async () => {
     try {
@@ -89,6 +108,17 @@ const UserDashboard = () => {
           </div>
         </div>
 
+        {/* Notifications */}
+        {notifications.length > 0 && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 rounded">
+            <ul>
+              {notifications.map((n, idx) => (
+                <li key={idx} className="text-yellow-800">{n.message}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Ride Table */}
         <div className="bg-white border rounded p-4">
           <h2 className="text-lg font-semibold mb-4">Your Rides</h2>
@@ -145,7 +175,7 @@ const UserDashboard = () => {
             View Map
           </Link>
           <Link to="/user/chat" className="bg-green-600 text-white px-4 py-2 text-sm rounded hover:bg-green-700">
-            Chat with Support
+            Chat with Captain
           </Link>
           <Link to="/settings" className="bg-gray-500 text-white px-4 py-2 text-sm rounded hover:bg-gray-600">
             Settings

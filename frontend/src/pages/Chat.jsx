@@ -2,12 +2,15 @@ import React, { useState, useEffect, useContext } from 'react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { UserDataContext } from '../context/UserContext';
+import useWebSocket from '../hooks/useWebSocket';
 
 const Chat = ({ role }) => {
   const [user] = useContext(UserDataContext);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const { socket } = useWebSocket();
+  const [tripId, setTripId] = useState(null); // Set this from trip context or selection
 
   useEffect(() => {
     setTimeout(() => {
@@ -19,17 +22,32 @@ const Chat = ({ role }) => {
     }, 1000);
   }, [user.fullname.firstName]);
 
+  useEffect(() => {
+    if (!socket) return;
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'chat_message' && data.data.tripId === tripId) {
+        setMessages((prev) => [...prev, data.data.message]);
+      }
+    };
+  }, [socket, tripId]);
+
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
-    const message = {
-      id: messages.length + 1,
+    if (!newMessage.trim() || !tripId) return;
+    const messageObj = {
       sender: user.fullname.firstName,
       text: newMessage,
       timestamp: new Date(),
     };
-    setMessages([...messages, message]);
+    setMessages([...messages, messageObj]);
     setNewMessage('');
+    if (socket && socket.readyState === 1) {
+      socket.send(JSON.stringify({
+        type: 'message',
+        data: { tripId, message: newMessage }
+      }));
+    }
     toast.success('Message sent!');
   };
 

@@ -1,93 +1,191 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import { motion } from 'framer-motion';
 import { UserDataContext } from '../context/UserContext';
+import useWebSocket from '../hooks/useWebSocket';
+import { formatDistance } from '../utils/distance';
 
 const BookRide = () => {
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const [user] = useContext(UserDataContext);
   const navigate = useNavigate();
+  const { socket, connected } = useWebSocket();
+  
+  const [step, setStep] = useState(1);
+  const [rideType, setRideType] = useState('ride');
+  const [pickupLocation, setPickupLocation] = useState(null);
+  const [dropLocation, setDropLocation] = useState(null);
+  const [amount, setAmount] = useState('');
+  const [activeCaptains, setActiveCaptains] = useState([]);
+  const [selectedCaptain, setSelectedCaptain] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const submitHandler = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/user/book-ride`,
-        { from, to },
-        {
-          headers: { Authorization: `Bearer ${user.token}` },
-          withCredentials: true,
-        }
-      );
-      toast.success('Ride booked successfully!');
-      setFrom('');
-      setTo('');
-      navigate('/user/dashboard');
-    } catch (err) {
-      const message = err.response?.data?.message || 'Failed to book ride';
-      setError(message);
-      toast.error(message);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.addEventListener('message', (event) => {
+      const data = JSON.parse(event.data);
+      
+      switch (data.type) {
+        case 'active_captains':
+          setActiveCaptains(data.data);
+          break;
+        case 'trip_accepted':
+          handleTripAccepted(data.data);
+          break;
+        case 'chat_message':
+          handleNewMessage(data.data);
+          break;
+      }
+    });
+  }, [socket]);
+
+  const handleLocationSelect = (type, latlng, address) => {
+    if (type === 'pickup') {
+      setPickupLocation({ coordinates: latlng, address });
+    } else {
+      setDropLocation({ coordinates: latlng, address });
     }
   };
 
+  const handleSubmit = async () => {
+  if (!pickupLocation || !dropLocation || !amount) {
+    toast.error('Please fill all fields');
+    return;
+  }
+  if (!socket || !connected) {
+    toast.error('Not connected to server');
+    return;
+  }
+  setLoading(true);
+  try {
+    socket.send(JSON.stringify({
+      type: 'trip_request',
+      data: {
+        type: rideType,
+        from: pickupLocation,
+        to: dropLocation,
+        proposedAmount: parseFloat(amount)
+      }
+    }));
+    toast.success('Ride request sent! Waiting for captains...');
+    setStep(3);
+  } catch (error) {
+    toast.error('Failed to request ride');
+  } finally {
+    setLoading(false);
+  }
+};
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="min-h-screen bg-gray-50 flex items-center justify-center p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="min-h-screen bg-gray-50"
     >
-      <div className="w-full max-w-md bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-        <h2 className="text-xl font-semibold text-center mb-5 text-gray-800">Book a Ride</h2>
-        
-        {error && (
-          <p className="text-sm text-red-600 bg-red-100 border border-red-200 rounded p-2 mb-4 text-center">
-            {error}
-          </p>
-        )}
-        
-        <form onSubmit={submitHandler} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Pickup Location</label>
-            <input
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              required
-              className="w-full px-4 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 text-sm"
-              type="text"
-              placeholder="e.g. Dhanmondi, Dhaka"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Destination</label>
-            <input
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              required
-              className="w-full px-4 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 text-sm"
-              type="text"
-              placeholder="e.g. Banani, Dhaka"
-            />
-          </div>
+      <div className="max-w-4xl mx-auto p-4">
+        {/* Step indicators */}
+        <div className="flex justify-between mb-8">
+          {/* ... Step indicators UI ... */}
+        </div>
 
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-md text-sm font-semibold hover:bg-blue-700 disabled:bg-blue-400 transition"
-          >
-            {loading ? 'Booking...' : 'Book Ride'}
-          </motion.button>
-        </form>
+        {step === 1 && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold mb-4">Select Ride Type</h2>
+            <div className="flex gap-4">
+              <button
+                className={`flex-1 p-4 rounded ${
+                  rideType === 'ride' ? 'bg-blue-500 text-white' : 'bg-gray-100'
+                }`}
+                onClick={() => setRideType('ride')}
+              >
+                Ride
+              </button>
+              <button
+                className={`flex-1 p-4 rounded ${
+                  rideType === 'parcel' ? 'bg-blue-500 text-white' : 'bg-gray-100'
+                }`}
+                onClick={() => setRideType('parcel')}
+              >
+                Parcel
+              </button>
+            </div>
+            <button
+              className="w-full mt-6 bg-blue-500 text-white p-3 rounded"
+              onClick={() => setStep(2)}
+            >
+              Continue
+            </button>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold mb-4">Select Locations</h2>
+            
+            {/* Map Component */}
+            <div className="h-[400px] mb-6">
+              <MapContainer
+                center={[23.8103, 90.4125]}
+                zoom={13}
+                className="h-full"
+              >
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                {/* ... Markers and location selection logic ... */}
+              </MapContainer>
+            </div>
+
+            {/* Location inputs */}
+            <div className="space-y-4 mb-6">
+              {/* ... Location input fields ... */}
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">
+                Proposed Amount (USD)
+              </label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full p-3 border rounded"
+                placeholder="Enter amount"
+              />
+            </div>
+
+            <button
+              className="w-full bg-blue-500 text-white p-3 rounded"
+              onClick={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? 'Requesting...' : 'Request Ride'}
+            </button>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold mb-4">Nearby Captains</h2>
+            
+            <div className="space-y-4">
+              {activeCaptains.map((captain) => (
+                <div
+                  key={captain.id}
+                  className="flex items-center justify-between p-4 border rounded"
+                >
+                  <div>
+                    <p className="font-medium">{captain.vehicle.type}</p>
+                    <p className="text-sm text-gray-500">
+                      {formatDistance(captain.distance)} away
+                    </p>
+                  </div>
+                  {/* ... Captain details and accept/chat buttons ... */}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );
