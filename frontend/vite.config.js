@@ -26,12 +26,12 @@ export default defineConfig({
             type: 'image/png',
           },
           {
-            src: '/assets/images/logo.png',
+            src: '/assets/images/logo-512.png',
             sizes: '512x512',
             type: 'image/png',
           },
           {
-            src: '/assets/images/logo.png',
+            src: '/assets/images/logo-mask.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'maskable',
