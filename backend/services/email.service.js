@@ -2,7 +2,7 @@ const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
+  port: parseInt(process.env.EMAIL_PORT, 10),
   secure: process.env.EMAIL_SECURE === 'true',
   auth: {
     user: process.env.EMAIL_USER,
@@ -10,7 +10,13 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const sendOTPEmail = async (to, otp) => {
+/**
+ * Sends OTP email to the specified address
+ * @param {string} to - Recipient email
+ * @param {string} otp - OTP code
+ * @returns {Promise<void>}
+ */
+async function sendOTPEmail(to, otp) {
   try {
     const mailOptions = {
       from: `"CarBar" <${process.env.EMAIL_USER}>`,
@@ -32,7 +38,7 @@ const sendOTPEmail = async (to, otp) => {
               <p style="font-size:14px; color:#666;">This code is valid for the next 5 minutes. Do not share it with anyone.</p>
               <p style="font-size:14px; color:#666;">If you didn’t request this, please ignore this email.</p>
               <hr style="margin:30px 0; border:none; border-top:1px solid #eee;">
-              <p style="font-size:12px; color:#aaa; text-align:center;">© ${new Date().getFullYear()} CarBar by <a href="https://devplus.fun/" target="_blank">Mahmud</a> .</p>
+              <p style="font-size:12px; color:#aaa; text-align:center;">© ${new Date().getFullYear()} CarBar by <a href="https://devplus.fun/" target="_blank">Mahmud</a>.</p>
             </div>
           </div>
         </div>
@@ -45,6 +51,6 @@ const sendOTPEmail = async (to, otp) => {
     console.error('Error sending OTP email:', error);
     throw new Error('Failed to send OTP email');
   }
-};
+}
 
 module.exports = { sendOTPEmail };

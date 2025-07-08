@@ -4,30 +4,23 @@ const jwt = require('jsonwebtoken');
 
 const userSchema = new mongoose.Schema({
   fullname: {
-    firstname: {
-      type: String,
-      required: true,
-      minlength: [3, 'First name must be at least 3 characters long'],
-    },
-    lastname: {
-      type: String,
-      minlength: [3, 'Last name must be at least 3 characters long'],
-    },
+    firstname: { type: String, required: true, minlength: 3 },
+    lastname: { type: String, minlength: 3 },
   },
   email: {
     type: String,
     required: true,
     unique: true,
-    minlength: [5, 'Email must be at least 5 characters'],
+    minlength: 5,
+    lowercase: true,
+    trim: true,
   },
   password: {
     type: String,
     required: true,
     select: false,
   },
-  socketId: {
-    type: String,
-  },
+  socketId: String,
   verified: {
     type: Boolean,
     default: false,
@@ -42,14 +35,30 @@ const userSchema = new mongoose.Schema({
   },
 });
 
+/**
+ * Generates JWT token for the user
+ * @returns {string} JWT token
+ */
 userSchema.methods.generateAuthToken = function () {
-  return jwt.sign({ _id: this._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
+  return jwt.sign({ _id: this._id, role: 'user' }, process.env.JWT_SECRET, {
+    expiresIn: '24h',
+  });
 };
 
+/**
+ * Compares provided password with stored hash
+ * @param {string} password - Plain text password
+ * @returns {Promise<boolean>} True if passwords match
+ */
 userSchema.methods.comparePassword = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
 
+/**
+ * Hashes a password
+ * @param {string} password - Plain text password
+ * @returns {Promise<string>} Hashed password
+ */
 userSchema.statics.hashPassword = async function (password) {
   return await bcrypt.hash(password, 10);
 };

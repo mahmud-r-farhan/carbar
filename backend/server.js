@@ -1,16 +1,16 @@
-const http = require('http');
 const app = require('./app');
-const initWebSocket = require('./ws'); // WebSocket initializer
+const http = require('http');
+const initWebSocket = require('./services/websocket.service');
+const { cleanEnv, num } = require('envalid');
+const logger = require('./config/logger');
 
-const port = process.env.PORT || 3000;
+const env = cleanEnv(process.env, {
+  PORT: num({ default: 3000 }),
+});
 
-// Create HTTP server from Express app
 const server = http.createServer(app);
+initWebSocket(server);
 
-// Initialize WebSocket server on top of HTTP server
-initWebSocket(server); // <-- this is the key line
-
-// Start server
-server.listen(port, () => {
-  console.log(`🚀 Server listening on http://localhost:${port}`);
+server.listen(env.PORT, () => {
+  logger.info(`🚀 Server running on port ${env.PORT}`);
 });

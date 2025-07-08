@@ -1,14 +1,11 @@
-const userModel = require('../models/user.model');
-const userService = require('../services/user.services');
 const { validationResult } = require('express-validator');
-const blackListTokenModel = require('../models/blacklistToken.model');
+const userService = require('../services/user.services');
 const { sendOTPEmail } = require('../services/email.service');
+const { generateOTP, getOTPExpiration } = require('../utils/otp.util');
+const blacklistTokenModel = require('../models/blacklistToken.model');
+const userModel = require('../models/user.model');
 
-function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-module.exports.registerUser = async (req, res, next) => {
+exports.registerUser = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -17,12 +14,12 @@ module.exports.registerUser = async (req, res, next) => {
 
     const { fullname, email, password } = req.body;
 
-    const existingUser = await userModel.findOne({ email });
+    const existingUser = await userService.findOne({ email });
 
     if (existingUser) {
       if (!existingUser.verified) {
         const otp = generateOTP();
-        const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiration
+        const expiresAt = getOTPExpiration();
 
         existingUser.verificationCode = { code: otp, expiresAt };
         await existingUser.save();
@@ -32,14 +29,13 @@ module.exports.registerUser = async (req, res, next) => {
           message: 'You already registered but not verified. OTP resent to your email.',
           userId: existingUser._id.toString(),
         });
-      } else {
-        return res.status(400).json({ message: 'User already exists' });
       }
+      return res.status(400).json({ message: 'User already exists' });
     }
 
     const hashedPassword = await userModel.hashPassword(password);
     const otp = generateOTP();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    const expiresAt = getOTPExpiration();
 
     const user = await userService.createUser({
       firstname: fullname.firstname,
@@ -56,30 +52,26 @@ module.exports.registerUser = async (req, res, next) => {
   }
 };
 
-module.exports.verifyUserOTP = async (req, res, next) => {
+exports.verifyUserOTP = async (req, res, next) => {
   try {
     const { userId, otp } = req.body;
-    const sanitizedOtp = otp.trim(); // Remove any whitespace
-    console.log('Verifying OTP for userId:', userId, 'OTP:', sanitizedOtp);
+    const sanitizedOtp = String(otp).trim();
 
     const user = await userModel.findById(userId);
-    if (!user || !user.verificationCode) {
-      console.log('Invalid userId or no verification code:', userId);
-      return res.status(400).json({ message: 'Invalid request' });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (!user.verificationCode || !user.verificationCode.code) {
+      return res.status(400).json({ message: 'No OTP associated with this account' });
     }
 
-    console.log('Stored OTP:', user.verificationCode.code, 'Expires At:', user.verificationCode.expiresAt);
+    const { code: storedOtp, expiresAt } = user.verificationCode;
+    if (expiresAt < new Date()) {
+      return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
+    }
 
-    if (
-      user.verificationCode.code !== sanitizedOtp ||
-      user.verificationCode.expiresAt < new Date()
-    ) {
-      console.log('OTP mismatch or expired:', {
-        stored: user.verificationCode.code,
-        provided: sanitizedOtp,
-        expired: user.verificationCode.expiresAt < new Date(),
-      });
-      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    if (storedOtp !== sanitizedOtp) {
+      return res.status(400).json({ message: 'Invalid OTP' });
     }
 
     user.verified = true;
@@ -88,12 +80,11 @@ module.exports.verifyUserOTP = async (req, res, next) => {
     const token = user.generateAuthToken();
     res.status(200).json({ message: 'Account verified', token, user });
   } catch (error) {
-    console.error('Error verifying OTP:', error);
     next(error);
   }
 };
 
-module.exports.loginUser = async (req, res, next) => {
+exports.loginUser = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -116,7 +107,8 @@ module.exports.loginUser = async (req, res, next) => {
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 3600000,
+      maxAge: parseInt(process.env.JWT_COOKIE_MAX_AGE, 10) || 3600000,
+      sameSite: 'strict',
     });
 
     res.status(200).json({ token, user });
@@ -125,7 +117,7 @@ module.exports.loginUser = async (req, res, next) => {
   }
 };
 
-module.exports.getUserProfile = async (req, res, next) => {
+exports.getUserProfile = async (req, res, next) => {
   try {
     res.status(200).json(req.user);
   } catch (error) {
@@ -133,7 +125,7 @@ module.exports.getUserProfile = async (req, res, next) => {
   }
 };
 
-module.exports.updateUserProfile = async (req, res, next) => {
+exports.updateUserProfile = async (req, res, next) => {
   try {
     const { fullname, profileImage } = req.body;
     const user = await userModel.findById(req.user._id);
@@ -149,14 +141,16 @@ module.exports.updateUserProfile = async (req, res, next) => {
   }
 };
 
-module.exports.logoutUser = async (req, res, next) => {
+exports.logoutUser = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1] || req.cookies.token;
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
     if (!token) {
       return res.status(400).json({ message: 'No token provided' });
     }
 
-    await BlacklistToken.create({ token });
+    await blacklistTokenModel.create({ token }).catch((err) => {
+      if (err.code !== 11000) throw err; // Ignore duplicate token error
+    });
 
     res.clearCookie('token', {
       httpOnly: true,
@@ -164,19 +158,14 @@ module.exports.logoutUser = async (req, res, next) => {
       sameSite: 'strict',
     });
 
-    return res.status(200).json({ message: 'Logged out successfully' });
+    res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
-    console.error('Logout error:', error);
-    if (error.code === 110) { // Handle duplicate token
-      return res.status(200).json({ message: 'Logged out successfully' });
-    }
     next(error);
   }
 };
 
-module.exports.getUserRides = async (req, res, next) => {
+exports.getUserRides = async (req, res, next) => {
   try {
-    // Mock rides data (replace with actual DB query in production)
     const rides = [
       { id: 1, from: 'Downtown', to: 'Airport', date: '2025-07-05', status: 'Completed', cost: 25 },
       { id: 2, from: 'Park Street', to: 'Mall', date: '2025-07-04', status: 'Pending', cost: 15 },

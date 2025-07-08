@@ -1,14 +1,17 @@
-const captainModel = require('../models/captain.model');
-const captainService = require('../services/captain.services');
 const { validationResult } = require('express-validator');
-const blackListTokenModel = require('../models/blacklistToken.model');
+const captainService = require('../services/captain.services');
 const { sendOTPEmail } = require('../services/email.service');
+const { generateOTP, getOTPExpiration } = require('../utils/otp.util');
+const blacklistTokenModel = require('../models/blacklistToken.model');
+const captainModel = require('../models/captain.model');
 
-function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-module.exports.registerCaptain = async (req, res, next) => {
+/**
+ * Registers a new captain
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+exports.registerCaptain = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -17,12 +20,12 @@ module.exports.registerCaptain = async (req, res, next) => {
 
     const { fullname, email, password, vehicle } = req.body;
 
-    const existingCaptain = await captainModel.findOne({ email });
+    const existingCaptain = await captainService.findOne({ email });
 
     if (existingCaptain) {
       if (!existingCaptain.verified) {
         const otp = generateOTP();
-        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+        const expiresAt = getOTPExpiration();
 
         existingCaptain.verificationCode = { code: otp, expiresAt };
         await existingCaptain.save();
@@ -32,15 +35,13 @@ module.exports.registerCaptain = async (req, res, next) => {
           message: 'You already registered but not verified. OTP resent to your email.',
           captainId: existingCaptain._id.toString(),
         });
-      } else {
-        return res.status(400).json({ message: 'Captain already exists' });
       }
+      return res.status(400).json({ message: 'Captain already exists' });
     }
 
-  
     const hashedPassword = await captainModel.hashPassword(password);
     const otp = generateOTP();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiration
+    const expiresAt = getOTPExpiration();
 
     const captain = await captainService.createCaptain({
       firstname: fullname.firstname,
@@ -61,35 +62,31 @@ module.exports.registerCaptain = async (req, res, next) => {
   }
 };
 
-module.exports.verifyCaptainOTP = async (req, res, next) => {
+/**
+ * Verifies a captain's OTP
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+exports.verifyCaptainOTP = async (req, res, next) => {
   try {
     const { captainId, otp } = req.body;
     const sanitizedOtp = String(otp).trim();
 
-    console.log('Verifying OTP for captainId:', captainId, 'OTP:', sanitizedOtp);
-
     const captain = await captainModel.findById(captainId);
     if (!captain) {
-      console.log('Captain not found for ID:', captainId);
-      return res.status(400).json({ message: 'Captain not found' });
+      return res.status(404).json({ message: 'Captain not found' });
     }
-    if (!captain.verificationCode) {
-      console.log('No verification code for captainId:', captainId);
+    if (!captain.verificationCode || !captain.verificationCode.code) {
       return res.status(400).json({ message: 'No OTP associated with this account' });
     }
 
-    console.log('Stored OTP:', captain.verificationCode.code, 'Expires At:', captain.verificationCode.expiresAt);
-
-    if (captain.verificationCode.expiresAt < new Date()) {
-      console.log('OTP expired for captainId:', captainId);
+    const { code: storedOtp, expiresAt } = captain.verificationCode;
+    if (expiresAt < new Date()) {
       return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
     }
 
-    if (String(captain.verificationCode.code).trim() !== sanitizedOtp) {
-      console.log('OTP mismatch:', {
-        stored: captain.verificationCode.code,
-        provided: sanitizedOtp,
-      });
+    if (storedOtp !== sanitizedOtp) {
       return res.status(400).json({ message: 'Invalid OTP' });
     }
 
@@ -99,12 +96,17 @@ module.exports.verifyCaptainOTP = async (req, res, next) => {
     const token = captain.generateAuthToken();
     res.status(200).json({ message: 'Account verified', token, captain });
   } catch (error) {
-    console.error('Error verifying OTP:', error);
     next(error);
   }
 };
 
-module.exports.loginCaptain = async (req, res, next) => {
+/**
+ * Logs in a captain
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+exports.loginCaptain = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -127,7 +129,8 @@ module.exports.loginCaptain = async (req, res, next) => {
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 3600000, // 1 hour
+      maxAge: parseInt(process.env.JWT_COOKIE_MAX_AGE, 10) || 3600000, // 1 hour
+      sameSite: 'strict',
     });
 
     res.status(200).json({ token, captain });
@@ -136,7 +139,13 @@ module.exports.loginCaptain = async (req, res, next) => {
   }
 };
 
-module.exports.getCaptainProfile = async (req, res, next) => {
+/**
+ * Gets captain profile
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+exports.getCaptainProfile = async (req, res, next) => {
   try {
     res.status(200).json(req.captain);
   } catch (error) {
@@ -144,7 +153,13 @@ module.exports.getCaptainProfile = async (req, res, next) => {
   }
 };
 
-module.exports.updateCaptainProfile = async (req, res, next) => {
+/**
+ * Updates captain profile
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+exports.updateCaptainProfile = async (req, res, next) => {
   try {
     const { fullname, profileImage } = req.body;
     const captain = await captainModel.findById(req.captain._id);
@@ -160,20 +175,42 @@ module.exports.updateCaptainProfile = async (req, res, next) => {
   }
 };
 
-module.exports.logoutCaptain = async (req, res, next) => {
+/**
+ * Logs out a captain
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+exports.logoutCaptain = async (req, res, next) => {
   try {
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-    if (token) {
-      await blackListTokenModel.create({ token });
+    if (!token) {
+      return res.status(400).json({ message: 'No token provided' });
     }
-    res.clearCookie('token');
-    res.status(200).json({ message: 'Logged out' });
+
+    await blacklistTokenModel.create({ token }).catch((err) => {
+      if (err.code !== 11000) throw err; // Ignore duplicate token error
+    });
+
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    });
+
+    res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
     next(error);
   }
 };
 
-module.exports.getCaptainTrips = async (req, res, next) => {
+/**
+ * Gets captain trips
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+exports.getCaptainTrips = async (req, res, next) => {
   try {
     const trips = [
       { id: 1, passenger: 'John Doe', from: 'Downtown', to: 'Airport', date: '2025-07-05', status: 'Accepted', earnings: 30 },

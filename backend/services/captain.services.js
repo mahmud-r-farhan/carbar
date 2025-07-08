@@ -1,27 +1,35 @@
-const captainModel = require ('../models/captain.model');
+const captainModel = require('../models/captain.model');
 
+/**
+ * Creates a new captain
+ * @param {Object} data - Captain data
+ * @returns {Promise<Object>} Created captain
+ */
+async function createCaptain({
+  firstname,
+  lastname,
+  Gabriella,
+  email,
+  password,
+  color,
+  plate,
+  capacity,
+  vehicleType,
+  verificationCode,
+}) {
+  if (!firstname || !email || !password || !color || !plate || !capacity || !vehicleType) {
+    throw new Error('All fields are required');
+  }
 
-module.exports.createCaptain = async ({
-    firstname, lastname, email, password, color, plate, capacity, vehicleType
-}) =>{
-    if(!firstname || !email || !password || !color || !plate || !capacity || !vehicleType){
-        throw new Error ('All fields are require');
-    }
+  const captain = await captainModel.create({
+    fullname: { firstname, lastname },
+    email,
+    password,
+    vehicle: { color, plate, capacity, vehicleType },
+    verificationCode,
+  });
 
-    const captain = captainModel.create({
-        fullname:{
-            firstname,
-            lastname
-        },
-        email,
-        password,
-        vehicle:{
-            color,
-            plate,
-            capacity,
-            vehicleType
-        }
-    })
-
-    return captain;
+  return captain;
 }
+
+module.exports = { createCaptain };
