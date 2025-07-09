@@ -6,12 +6,13 @@ import { UserDataContext } from '../context/UserContext';
 
 const Settings = ({ role = 'user' }) => {
   const [user, setUser] = useContext(UserDataContext);
-  const [firstName, setFirstName] = useState(user.fullname.firstName);
-  const [lastName, setLastName] = useState(user.fullname.lastName);
+  const [firstName, setFirstName] = useState(user.fullname.firstName || user.fullname.firstname || '');
+  const [lastName, setLastName] = useState(user.fullname.lastName || user.fullname.lastname || '');
   const [profileImage, setProfileImage] = useState(user.profileImage || '');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
+  // Use Cloudinary direct upload (do not use axios instance withCredentials)
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -21,12 +22,20 @@ const Settings = ({ role = 'user' }) => {
     formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
 
     try {
-      const res = await axios.post(
+      const res = await fetch(
         `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
-        formData
+        {
+          method: 'POST',
+          body: formData,
+        }
       );
-      setProfileImage(res.data.secure_url);
-      toast.success('Profile image uploaded!');
+      const data = await res.json();
+      if (data.secure_url) {
+        setProfileImage(data.secure_url);
+        toast.success('Profile image uploaded!');
+      } else {
+        throw new Error('Image upload failed');
+      }
     } catch (err) {
       toast.error('Image upload failed');
       setError('Image upload failed');
@@ -40,25 +49,39 @@ const Settings = ({ role = 'user' }) => {
     setError('');
     try {
       const endpoint = role === 'user' ? '/user/update-profile' : '/captain/update-profile';
+      const payload = {
+        fullname: { firstname: firstName, lastname: lastName },
+        profileImage,
+      };
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}${endpoint}`,
-        {
-          fullname: { firstname: firstName, lastname: lastName },
-          profileImage,
-        },
+        payload,
         {
           headers: { Authorization: `Bearer ${user.token}` },
           withCredentials: true,
         }
       );
-      const updatedUser = {
-        ...user,
-        fullname: {
-          firstName: response.data.user?.fullname.firstname || response.data.captain?.fullname.firstname,
-          lastName: response.data.user?.fullname.lastname || response.data.captain?.fullname.lastname,
-        },
-        profileImage: response.data.user?.profileImage || response.data.captain?.profileImage,
-      };
+      // Update user context with correct field names
+      let updatedUser;
+      if (role === 'user') {
+        updatedUser = {
+          ...user,
+          fullname: {
+            firstName: response.data.user?.fullname.firstname || firstName,
+            lastName: response.data.user?.fullname.lastname || lastName,
+          },
+          profileImage: response.data.user?.profileImage || profileImage,
+        };
+      } else {
+        updatedUser = {
+          ...user,
+          fullname: {
+            firstName: response.data.captain?.fullname.firstname || firstName,
+            lastName: response.data.captain?.fullname.lastname || lastName,
+          },
+          profileImage: response.data.captain?.profileImage || profileImage,
+        };
+      }
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
       toast.success('Profile updated successfully!');

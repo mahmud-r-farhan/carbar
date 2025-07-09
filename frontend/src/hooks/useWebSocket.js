@@ -1,46 +1,61 @@
 import { useEffect, useRef, useState } from 'react';
 
+// Allow multiple listeners for messages (chat, notification, etc.)
 const useWebSocket = () => {
   const [connected, setConnected] = useState(false);
   const [socket, setSocket] = useState(null);
-  const wsRef = useRef(null); // Use ref to track WebSocket instance
+  const listenersRef = useRef([]);
+  const wsRef = useRef(null);
+
+  // Subscribe to messages
+  const subscribe = (cb) => {
+    listenersRef.current.push(cb);
+    return () => {
+      listenersRef.current = listenersRef.current.filter((fn) => fn !== cb);
+    };
+  };
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
-    if (!user?._id || !user?.token) {
-      console.warn('User ID or token missing, skipping WebSocket connection');
+    if (!user?._id || !user?.token || !user?.role) {
+      setConnected(false);
+      setSocket(null);
       return;
     }
 
-    const wsUrl = `${import.meta.env.VITE_WS_SERVER_URL}/user/${user._id}?token=${user.token}`;
+    // Use role for path: /user/:id or /captain/:id
+    const wsUrl = `${import.meta.env.VITE_WS_SERVER_URL}/${user.role}/${user._id}?token=${user.token}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log('WebSocket connected');
       setConnected(true);
+      setSocket(ws);
     };
     ws.onclose = () => {
-      console.log('WebSocket disconnected');
       setConnected(false);
       setSocket(null);
     };
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+    ws.onerror = () => {
       setConnected(false);
       setSocket(null);
     };
-
-    setSocket(ws);
+    ws.onmessage = (event) => {
+      // Notify all listeners
+      listenersRef.current.forEach((cb) => cb(event));
+    };
 
     return () => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.close();
       }
+      setConnected(false);
+      setSocket(null);
     };
-  }, []);
+  // Depend on user._id, user.token, user.role for reconnect
+  }, [localStorage.getItem('user')]);
 
-  return { socket, connected };
+  return { socket, connected, subscribe };
 };
 
 export default useWebSocket;

@@ -23,11 +23,12 @@ const UserLogin = () => {
       const userData = await login(email.trim(), password.trim(), 'user');
       setEmail('');
       setPassword('');
-      if (userData.role === 'user') {
-        navigate('/user/dashboard');
-      }
+      setTimeout(() => {
+        navigate('/user/dashboard', { replace: true });
+      }, 100);
     } catch (err) {
       const message = err?.response?.data?.message || 'Login failed';
+      console.error('UserLogin - Error:', err.response?.data);
       setError(message);
       toast.error(message);
     } finally {
@@ -56,7 +57,7 @@ const UserLogin = () => {
             required
             className="bg-[#eeeeee] mb-7 rounded px-4 border w-full text-lg h-11 placeholder:text-base"
             type="email"
-            placeholder ="Type your email address"
+            placeholder="Type your email address"
           />
           <h3 className="text-xl mb-2">Enter Password</h3>
           <div className="relative mb-6">
@@ -77,7 +78,7 @@ const UserLogin = () => {
             </button>
           </div>
           <motion.button
-            whileHover={{ scale: 1.05 }}
+            whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.95 }}
             className="bg-[#111] text-white mb-7 rounded px-4 border w-full h-11 text-lg disabled:bg-gray-400"
             type="submit"

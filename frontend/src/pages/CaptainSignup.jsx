@@ -242,7 +242,7 @@ const CaptainSignup = () => {
               <option value="bicycle">Bicycle</option>
             </select>
             <motion.button
-              whileHover={{ scale: 1.05 }}
+              whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.95 }}
               className="bg-[#111] text-white mb-7 rounded px-4 border w-full h-11 text-lg"
               type="submit"

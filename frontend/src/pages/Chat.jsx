@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { UserDataContext } from '../context/UserContext';
@@ -9,9 +9,11 @@ const Chat = ({ role }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const { socket } = useWebSocket();
-  const [tripId, setTripId] = useState(null); // Set this from trip context or selection
+  const { socket, subscribe } = useWebSocket();
+  const [tripId, setTripId] = useState(null); // Should be set from trip context or selection
+  const unsubRef = useRef(null);
 
+  // Simulate loading and initial messages
   useEffect(() => {
     setTimeout(() => {
       setMessages([
@@ -22,15 +24,22 @@ const Chat = ({ role }) => {
     }, 1000);
   }, [user.fullname.firstName]);
 
+  // Listen for chat messages via WebSocket
   useEffect(() => {
-    if (!socket) return;
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'chat_message' && data.data.tripId === tripId) {
-        setMessages((prev) => [...prev, data.data.message]);
-      }
+    if (!socket || !tripId) return;
+    if (unsubRef.current) unsubRef.current();
+    unsubRef.current = subscribe((event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'chat_message' && data.data.tripId === tripId) {
+          setMessages((prev) => [...prev, data.data.message]);
+        }
+      } catch {}
+    });
+    return () => {
+      if (unsubRef.current) unsubRef.current();
     };
-  }, [socket, tripId]);
+  }, [socket, tripId, subscribe]);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -71,9 +80,9 @@ const Chat = ({ role }) => {
           ) : messages.length === 0 ? (
             <p className="text-gray-500 text-center">No messages yet.</p>
           ) : (
-            messages.map((msg) => (
+            messages.map((msg, idx) => (
               <motion.div
-                key={msg.id}
+                key={msg.id || idx}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}

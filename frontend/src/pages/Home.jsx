@@ -1,26 +1,30 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { UserDataContext } from '../context/UserContext';
 
 const Home = () => {
   const navigate = useNavigate();
+  const [user] = useContext(UserDataContext);
 
-  const token = localStorage.getItem('token');
-  const role = localStorage.getItem('role');
-
-const handleContinue = () => {
-  if (!token) {
-    navigate('/login');
-    return;
-  }
-  if (role === 'captain') {
-    navigate('/captain/dashboard');
-  } else if (role === 'user') {
-    navigate('/user/dashboard');
-  } else {
-    navigate('/login');
-  }
-};
+  const handleContinue = () => {
+    console.log('Home - User:', user);
+    if (!user._id || !user.token) {
+      console.log('Home - No user, navigating to /login');
+      navigate('/login');
+      return;
+    }
+    if (user.role === 'captain') {
+      console.log('Home - Navigating to /captain/dashboard');
+      navigate('/captain/dashboard');
+    } else if (user.role === 'user') {
+      console.log('Home - Navigating to /user/dashboard');
+      navigate('/user/dashboard');
+    } else {
+      console.log('Home - Invalid role, navigating to /login');
+      navigate('/login');
+    }
+  };
 
   return (
     <motion.div
@@ -46,7 +50,6 @@ const handleContinue = () => {
         <p className="mb-4 text-gray-600">
           Your smart ride-sharing companion. Book rides, chat, and manage your profile easily!
         </p>
-
         <motion.button
           onClick={handleContinue}
           className="flex items-center justify-center w-full bg-black text-white py-3 rounded mt-5"
