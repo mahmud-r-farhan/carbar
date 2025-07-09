@@ -8,7 +8,6 @@ const captainModel = require('../models/captain.model');
 async function createCaptain({
   firstname,
   lastname,
-  Gabriella,
   email,
   password,
   color,
@@ -32,4 +31,8 @@ async function createCaptain({
   return captain;
 }
 
-module.exports = { createCaptain };
+async function findOne(query) {
+  return await captainModel.findOne(query);
+}
+
+module.exports = { createCaptain, findOne };

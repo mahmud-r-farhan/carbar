@@ -169,6 +169,18 @@ function initWebSocket(server) {
           })
         );
       }
+      // Optionally, notify all captains that trip is accepted
+      activeCaptains.forEach((c) => {
+        const client = clients.get(c.id.toString());
+        if (client?.ws.readyState === WebSocket.OPEN) {
+          client.ws.send(
+            JSON.stringify({
+              type: 'trip_accepted',
+              data: trip,
+            })
+          );
+        }
+      });
     }
   }
 
@@ -181,21 +193,37 @@ function initWebSocket(server) {
     const trip = await Trip.findById(tripId);
     if (!trip) return;
 
-    trip.messages.push({
+    const msgObj = {
       sender: user._id,
       text: message,
-    });
+      timestamp: new Date(),
+    };
+    trip.messages.push(msgObj);
     await trip.save();
 
+    // Send to the other party (user or captain)
     const otherId = user.vehicle ? trip.userId : trip.captainId;
-    const otherClient = clients.get(otherId.toString());
+    const otherClient = clients.get(otherId?.toString());
     if (otherClient?.ws.readyState === WebSocket.OPEN) {
       otherClient.ws.send(
         JSON.stringify({
           type: 'chat_message',
           data: {
             tripId,
-            message: trip.messages[trip.messages.length - 1],
+            message: msgObj,
+          },
+        })
+      );
+    }
+    // Also echo back to sender for confirmation
+    const senderClient = clients.get(user._id.toString());
+    if (senderClient?.ws.readyState === WebSocket.OPEN) {
+      senderClient.ws.send(
+        JSON.stringify({
+          type: 'chat_message',
+          data: {
+            tripId,
+            message: msgObj,
           },
         })
       );
