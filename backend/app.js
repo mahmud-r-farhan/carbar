@@ -4,19 +4,21 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
-const rateLimit = require('express-rate-limit');
+const { RateLimiterRedis } = require('rate-limiter-flexible');
+const { createClient } = require('redis');
 const sanitizeHtml = require('sanitize-html');
 const webpush = require('web-push');
 const { body, validationResult } = require('express-validator');
-const { cleanEnv, str, num } = require('envalid');
 const compression = require('compression');
 const morgan = require('morgan');
 
 const connectToDb = require('./db/db.js');
 const { configureVapid } = require('./config/vapid');
 const logger = require('./config/logger');
+const env = require('./config/env');
 const userRoutes = require('./routes/user.routes');
 const captainRoutes = require('./routes/captain.routes');
+const tripRoutes = require('./routes/trip.routes');
 const swaggerRoutes = require('./docs/swagger');
 const errorMiddleware = require('./middlewares/error.middleware');
 const { auth } = require('./middlewares/auth.middleware');
@@ -24,37 +26,55 @@ const Subscription = require('./models/subscription.model');
 
 const app = express();
 
-// Validate environment variables
-const env = cleanEnv(process.env, {
-  DB_CONNECT: str(),
-  JWT_SECRET: str(),
-  EMAIL_HOST: str(),
-  EMAIL_PORT: num(),
-  EMAIL_USER: str(),
-  EMAIL_PASS: str(),
-  VAPID_PUBLIC_KEY: str(),
-  VAPID_PRIVATE_KEY: str(),
-  ALLOWED_ORIGINS: str(),
-  PORT: num({ default: 3000 }),
-  RATE_LIMIT_WINDOW_MS: num({ default: 15 * 60 * 1000 }), // 15 minutes
-  RATE_LIMIT_MAX: num({ default: 100 }), // Max 100 requests per window
+// Initialize Redis client
+const redisClient = createClient({ url: env.REDIS_URL });
+redisClient.on('error', (err) => logger.error('Redis client error', { error: err.message }));
+redisClient.on('reconnecting', () => logger.info('Redis client reconnecting'));
+
+async function connectRedis() {
+  try {
+    await redisClient.connect();
+    logger.info('Redis client connected successfully');
+  } catch (err) {
+    logger.error('Failed to connect to Redis', { error: err.message });
+    process.exit(1);
+  }
+}
+connectRedis();
+
+// Redis-based rate limiter
+const rateLimiter = new RateLimiterRedis({
+  storeClient: redisClient,
+  points: env.RATE_LIMIT_MAX,
+  duration: env.RATE_LIMIT_WINDOW_MS / 1000,
+  keyPrefix: 'rate-limit',
 });
 
+// Connect to database and configure VAPID
 connectToDb();
 configureVapid();
 
 // Security middlewares
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      connectSrc: ["'self'", ...env.ALLOWED_ORIGINS.split(','), env.WS_BASE_URL],
+    },
+  },
+}));
 app.use(mongoSanitize());
 app.use(compression());
 app.use(morgan('combined', { stream: logger.stream }));
-app.use(
-  rateLimit({
-    windowMs: env.RATE_LIMIT_WINDOW_MS,
-    max: env.RATE_LIMIT_MAX,
-    message: 'Too many requests, please try again later.',
-  })
-);
+app.use(async (req, res, next) => {
+  try {
+    await rateLimiter.consume(req.ip);
+    next();
+  } catch (err) {
+    logger.warn('Rate limit exceeded', { ip: req.ip });
+    res.status(429).json({ error: 'Too many requests, please try again later' });
+  }
+});
 
 // CORS configuration
 const corsOptions = {
@@ -63,13 +83,15 @@ const corsOptions = {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      logger.warn('CORS blocked', { origin });
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
+  optionsSuccessStatus: 200,
 };
-
 app.use(cors(corsOptions));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -82,22 +104,29 @@ app.get('/', (req, res) => {
   res.send('CarBar API, Visit: https://carbar-pi.vercel.app/ or /api-docs for documentation');
 });
 
-/**
- * Gets VAPID public key
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- */
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    const dbConnected = require('mongoose').connection.readyState === 1;
+    const redisConnected = redisClient.isOpen;
+    res.status(200).json({
+      status: 'ok',
+      dbConnected,
+      redisConnected,
+    });
+  } catch (err) {
+    logger.error('Health check failed', { error: err.message });
+    res.status(500).json({ status: 'error', error: 'Health check failed' });
+  }
+});
+
+app.get('/healthz', (req, res) => res.send('OK'));
+
 app.get('/vapid-public-key', (req, res) => {
   logger.info('VAPID public key requested');
   res.json({ publicKey: env.VAPID_PUBLIC_KEY });
 });
 
-/**
- * Saves push notification subscription
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next middleware function
- */
 app.post(
   '/subscribe',
   auth,
@@ -132,18 +161,12 @@ app.post(
       logger.info(`Subscription saved for user: ${req.entity._id}`);
       res.status(201).json({ message: 'Subscription saved' });
     } catch (error) {
-      logger.error('Error saving subscription:', { error: error.message });
+      logger.error('Error saving subscription', { error: error.message });
       next(error);
     }
   }
 );
 
-/**
- * Sends push notification
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next middleware function
- */
 app.post(
   '/send-notification',
   auth,
@@ -174,18 +197,17 @@ app.post(
           logger.info(`Notification sent to ${sub.endpoint}`);
         } catch (err) {
           if (err.statusCode === 410) {
-            // Subscription expired or invalid, remove it
             await Subscription.deleteOne({ endpoint: sub.endpoint });
             logger.warn(`Removed expired subscription: ${sub.endpoint}`);
           }
           results.push({ success: false, endpoint: sub.endpoint, error: err.message });
-          logger.error(`Failed to send notification to ${sub.endpoint}:`, { error: err.message });
+          logger.error(`Failed to send notification to ${sub.endpoint}`, { error: err.message });
         }
       }
 
       res.json({ results });
     } catch (error) {
-      logger.error('Error sending notification:', { error: error.message });
+      logger.error('Error sending notification', { error: error.message });
       next(error);
     }
   }
@@ -193,8 +215,15 @@ app.post(
 
 app.use('/user', userRoutes);
 app.use('/captain', captainRoutes);
-app.get('/healthz', (req, res) => res.send('OK'));
+app.use('/trips', tripRoutes);
 
 app.use(errorMiddleware);
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  logger.info('Received SIGTERM. Performing graceful shutdown');
+  await redisClient.quit();
+  logger.info('Redis client shut down');
+});
 
 module.exports = app;

@@ -3,14 +3,12 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App.jsx';
 import { BrowserRouter } from 'react-router-dom';
-import UserContext from './context/UserContext.jsx';
 import { registerSW } from 'virtual:pwa-register';
-
 
 const updateSW = registerSW({
   onNeedRefresh() {
     if (confirm('New content is available. Refresh now?')) {
-      updateSW(true); // Trigger the update
+      updateSW(true);
     }
   },
   onOfflineReady() {
@@ -18,23 +16,41 @@ const updateSW = registerSW({
   },
 });
 
-// Register push notification subscription
 async function subscribeToPush() {
   if ('serviceWorker' in navigator && 'PushManager' in window) {
     try {
+      const storedUser = localStorage.getItem('user');
+      if (!storedUser) {
+        console.log('No user found, skipping push subscription');
+        return;
+      }
+      const userData = JSON.parse(storedUser);
+      const token = userData?.token;
+      if (!token) {
+        console.log('No token found, skipping push subscription');
+        return;
+      }
+
       const reg = await navigator.serviceWorker.ready;
-      // Get VAPID public key from backend
       const res = await fetch(`${import.meta.env.VITE_API_URL}/vapid-public-key`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch VAPID public key: ${res.statusText}`);
+      }
       const { publicKey } = await res.json();
+      if (!publicKey) {
+        throw new Error('VAPID public key is missing in response');
+      }
       const convertedKey = urlBase64ToUint8Array(publicKey);
       const subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: convertedKey,
       });
-      // Send subscription to backend
       await fetch(`${import.meta.env.VITE_API_URL}/subscribe`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(subscription),
         credentials: 'include',
       });
@@ -44,7 +60,6 @@ async function subscribeToPush() {
   }
 }
 
-// Helper to convert VAPID key
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
@@ -56,19 +71,14 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
-// Call subscribeToPush on load
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    subscribeToPush();
-  });
+  window.addEventListener('load', subscribeToPush);
 }
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <UserContext>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </UserContext>
-  </StrictMode>,
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </StrictMode>
 );

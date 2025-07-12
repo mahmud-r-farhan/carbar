@@ -4,6 +4,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { UserDataContext } from '../context/UserContext';
+import axios from '../services/axios';
 
 const UserLogin = () => {
   const [email, setEmail] = useState('');
@@ -11,7 +12,7 @@ const UserLogin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [, , login] = useContext(UserDataContext);
+  const { login } = useContext(UserDataContext);
   const navigate = useNavigate();
 
   const submitHandler = async (e) => {
@@ -27,10 +28,31 @@ const UserLogin = () => {
         navigate('/user/dashboard', { replace: true });
       }, 100);
     } catch (err) {
-      const message = err?.response?.data?.message || 'Login failed';
-      console.error('UserLogin - Error:', err.response?.data);
+      const message = err.message || 'Login failed';
+      console.error('UserLogin - Error:', { message, error: err });
       setError(message);
       toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    if (!email.trim()) {
+      toast.error('Please enter your email address to resend verification.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_API_URL}/user/resend-verification`,
+        { email: email.trim() },
+        { withCredentials: true }
+      );
+      toast.success('Verification email resent. Please check your inbox.');
+    } catch (err) {
+      console.error('Resend verification failed:', err.response?.data || err.message);
+      toast.error(err.response?.data?.message || 'Failed to resend verification email.');
     } finally {
       setLoading(false);
     }
@@ -48,7 +70,9 @@ const UserLogin = () => {
           src="/assets/images/carbar.png"
           alt="CarBar Logo"
         />
-        {error && <p className="text-red-500 mb-4 bg-red-100 p-2 rounded">{error}</p>}
+        {error && (
+          <p className="text-red-500 mb-4 bg-red-100 p-2 rounded">{error}</p>
+        )}
         <form onSubmit={submitHandler}>
           <h3 className="text-xl mb-2">What's your email</h3>
           <input
@@ -87,6 +111,15 @@ const UserLogin = () => {
             {loading ? 'Logging in...' : 'Login'}
           </motion.button>
         </form>
+        {error.includes('unverified account') && (
+          <button
+            onClick={resendVerification}
+            className="text-blue-500 hover:text-blue-700 mb-4"
+            disabled={loading}
+          >
+            Resend Verification Email
+          </button>
+        )}
         <p>
           New?{' '}
           <Link to="/signup" className="text-orange-500 hover:text-blue-600">

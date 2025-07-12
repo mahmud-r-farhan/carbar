@@ -3,6 +3,9 @@ const router = express.Router();
 const { body } = require('express-validator');
 const userController = require('../controllers/user.controller');
 const { auth } = require('../middlewares/auth.middleware');
+const Trip = require('../models/trip.model');
+const userModel = require('../models/user.model');
+const logger = require('../config/logger');
 
 router.post(
   '/register',
@@ -32,9 +35,32 @@ router.post(
   userController.loginUser
 );
 
-router.get('/profile', auth, userController.getUserProfile);
+router.get('/profile', auth, async (req, res, next) => {
+  try {
+    const user = await userModel.findById(req.user._id).select('-password -__v');
+    if (!user) {
+      logger.warn('User profile not found', { userId: req.user._id });
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json({
+      user: {
+        _id: user._id,
+        email: user.email,
+        fullname: user.fullname,
+        role: user.role,
+        verified: user.verified,
+        profileImage: user.profileImage || '',
+        socketId: user.socketId || null,
+      },
+    });
+    logger.info('User profile fetched', { userId: req.user._id });
+  } catch (error) {
+    logger.error('Error fetching user profile:', { error: error.message });
+    next(error);
+  }
+});
 
-router.post( // Change to POST to match controller
+router.post(
   '/update-profile',
   auth,
   [
@@ -60,16 +86,22 @@ router.post(
   auth,
   [
     body('from.address').notEmpty().withMessage('Pickup address is required'),
-    body('from.coordinates.lat').isFloat().withMessage('Invalid pickup latitude'),
-    body('from.coordinates.lng').isFloat().withMessage('Invalid pickup longitude'),
+    body('from.coordinates.lat').isFloat({ min: -90, max: 90 }).withMessage('Invalid pickup latitude'),
+    body('from.coordinates.lng').isFloat({ min: -180, max: 180 }).withMessage('Invalid pickup longitude'),
     body('to.address').notEmpty().withMessage('Destination address is required'),
-    body('to.coordinates.lat').isFloat().withMessage('Invalid destination latitude'),
-    body('to.coordinates.lng').isFloat().withMessage('Invalid destination longitude'),
+    body('to.coordinates.lat').isFloat({ min: -90, max: 90 }).withMessage('Invalid destination latitude'),
+    body('to.coordinates.lng').isFloat({ min: -180, max: 180 }).withMessage('Invalid destination longitude'),
     body('type').isIn(['ride', 'parcel']).withMessage('Invalid trip type'),
     body('proposedAmount').isFloat({ min: 0 }).withMessage('Proposed amount must be non-negative'),
   ],
   async (req, res, next) => {
     try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        logger.warn('Book ride validation failed', { errors: errors.array() });
+        return res.status(400).json({ errors: errors.array() });
+      }
+
       const { from, to, type, proposedAmount } = req.body;
       const trip = await Trip.create({
         userId: req.user._id,
@@ -77,9 +109,34 @@ router.post(
         to,
         type,
         proposedAmount,
+        status: 'pending',
+        createdAt: new Date(),
       });
-      res.status(201).json({ message: 'Ride booked', trip });
+
+      // Trigger WebSocket trip_request
+      const { clients } = require('../services/websocket.service');
+      const userClient = clients.get(req.user._id.toString());
+      if (userClient?.ws.readyState === WebSocket.OPEN) {
+        userClient.ws.send(
+          JSON.stringify({
+            type: 'trip_request',
+            data: {
+              origin: from,
+              destination: to,
+              proposedAmount,
+              vehicleType: type,
+              tripId: trip._id.toString(),
+            },
+          })
+        );
+        logger.info('WebSocket trip_request sent', { tripId: trip._id, userId: req.user._id });
+      } else {
+        logger.warn('User not connected to WebSocket for trip request', { userId: req.user._id });
+      }
+
+      res.status(201).json({ message: 'Ride booked', trip: { id: trip._id, ...req.body } });
     } catch (error) {
+      logger.error('Error booking ride:', { error: error.message });
       next(error);
     }
   }

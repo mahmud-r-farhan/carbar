@@ -20,7 +20,7 @@ const UserSignUp = () => {
   const [otpError, setOtpError] = useState('');
   const [otpTimer, setOtpTimer] = useState(300);
   const [loading, setLoading] = useState(false);
-  const [, setUser] = useContext(UserDataContext);
+  const { setUser } = useContext(UserDataContext); 
   const navigate = useNavigate();
   const timerRef = useRef(null);
 

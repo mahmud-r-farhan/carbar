@@ -24,7 +24,7 @@ const CaptainSignup = () => {
   const [otpError, setOtpError] = useState('');
   const [otpTimer, setOtpTimer] = useState(300);
   const [loading, setLoading] = useState(false);
-  const [, setUser] = useContext(UserDataContext);
+  const { setUser } = useContext(UserDataContext); // Use object destructuring
   const navigate = useNavigate();
 
   // Timer effect for OTP expiration

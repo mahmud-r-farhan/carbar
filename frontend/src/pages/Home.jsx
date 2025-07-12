@@ -5,19 +5,19 @@ import { UserDataContext } from '../context/UserContext';
 
 const Home = () => {
   const navigate = useNavigate();
-  const [user] = useContext(UserDataContext);
+  const { user } = useContext(UserDataContext);
 
   const handleContinue = () => {
     console.log('Home - User:', user);
-    if (!user._id || !user.token) {
+    if (!user?._id || !user?.token) {
       console.log('Home - No user, navigating to /login');
       navigate('/login');
       return;
     }
-    if (user.role === 'captain') {
+    if (user?.role === 'captain') {
       console.log('Home - Navigating to /captain/dashboard');
       navigate('/captain/dashboard');
-    } else if (user.role === 'user') {
+    } else if (user?.role === 'user') {
       console.log('Home - Navigating to /user/dashboard');
       navigate('/user/dashboard');
     } else {
@@ -53,7 +53,7 @@ const Home = () => {
         <motion.button
           onClick={handleContinue}
           className="flex items-center justify-center w-full bg-black text-white py-3 rounded mt-5"
-          whileHover={{ scale: 1.05 }}
+          whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.95 }}
         >
           Continue

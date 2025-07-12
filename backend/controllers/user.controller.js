@@ -166,11 +166,18 @@ exports.logoutUser = async (req, res, next) => {
 
 exports.getUserRides = async (req, res, next) => {
   try {
-    const rides = [
-      { id: 1, from: 'Downtown', to: 'Airport', date: '2025-07-05', status: 'Completed', cost: 25 },
-      { id: 2, from: 'Park Street', to: 'Mall', date: '2025-07-04', status: 'Pending', cost: 15 },
-    ];
-    res.status(200).json(rides);
+    const trips = await Trip.find({ userId: req.user._id }).populate('captainId', 'fullname vehicle');
+    res.status(200).json(
+      trips.map((trip) => ({
+        id: trip._id,
+        from: trip.from.address,
+        to: trip.to.address,
+        date: trip.createdAt,
+        status: trip.status,
+        cost: trip.finalAmount || trip.proposedAmount,
+        captain: trip.captainId ? trip.captainId.fullname.firstname : 'N/A',
+      }))
+    );
   } catch (error) {
     next(error);
   }

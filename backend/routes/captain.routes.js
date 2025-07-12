@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const captainController = require('../controllers/captain.controller');
-const authMiddleware = require('../middlewares/auth.middleware');
+const { authCaptain } = require('../middlewares/auth.middleware');
 
 router.post(
   '/register',
@@ -38,11 +38,11 @@ router.post(
   captainController.loginCaptain
 );
 
-router.get('/profile', authMiddleware.authCaptain, captainController.getCaptainProfile);
+router.get('/profile', authCaptain, captainController.getCaptainProfile);
 
 router.post(
   '/update-profile',
-  authMiddleware.authCaptain,
+  authCaptain,
   [
     body('fullname.firstname')
       .optional()
@@ -53,12 +53,51 @@ router.post(
       .isLength({ min: 3 })
       .withMessage('Last name must be at least 3 characters long'),
     body('profileImage').optional().isURL().withMessage('Invalid profile image URL'),
+    body('vehicle.color')
+      .optional()
+      .isLength({ min: 3 })
+      .withMessage('Color must be at least 3 characters long'),
+    body('vehicle.plate')
+      .optional()
+      .isLength({ min: 4 })
+      .withMessage('Plate must be at least 4 characters long'),
+    body('vehicle.capacity')
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage('Capacity must be at least 1'),
+    body('vehicle.vehicleType')
+      .optional()
+      .isIn(['car', 'motorcycle', 'auto', 'cng', 'bicycle'])
+      .withMessage('Invalid vehicle type'),
   ],
   captainController.updateCaptainProfile
 );
 
-router.get('/trips', authMiddleware.authCaptain, captainController.getCaptainTrips);
+router.get('/trips', authCaptain, captainController.getCaptainTrips);
 
-router.get('/logout', authMiddleware.authCaptain, captainController.logoutCaptain);
+router.post(
+  '/respond-trip',
+  authCaptain,
+  [
+    body('tripId').isMongoId().withMessage('Invalid trip ID'),
+    body('action').isIn(['accept', 'reject']).withMessage('Invalid action'),
+    body('amount')
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage('Amount must be non-negative'),
+  ],
+  captainController.respondToTrip
+);
+
+router.post(
+  '/status',
+  authCaptain,
+  [
+    body('status').isIn(['active', 'inactive']).withMessage('Invalid status'),
+  ],
+  captainController.updateCaptainStatus
+);
+
+router.get('/logout', authCaptain, captainController.logoutCaptain);
 
 module.exports = router;

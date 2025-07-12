@@ -5,6 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import useWebSocket from '../hooks/useWebSocket';
 import { formatDistance, haversineDistance } from '../utils/distance';
+import { toast } from 'sonner';
 
 const MapZoomToUser = ({ userPosition }) => {
   const map = useMap();
@@ -18,75 +19,84 @@ const MapZoomToUser = ({ userPosition }) => {
 
 const Map = ({ role }) => {
   const [userPosition, setUserPosition] = useState(null);
-  const [otherUsers, setOtherUsers] = useState([]);
-  const [showRoutes, setShowRoutes] = useState(true);
   const [captains, setCaptains] = useState([]);
-  const { socket, connected } = useWebSocket();
+  const [showRoutes, setShowRoutes] = useState(true);
+  const { socket, connected, subscribe } = useWebSocket();
+  const user = JSON.parse(localStorage.getItem('user')); 
 
+  // Get user location and send updates for captains
   useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const current = {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            id: crypto.randomUUID(),
-          };
-          setUserPosition(current);
-          if (socket && connected && socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify(current));
-          }
-        },
-        (err) => {
-          console.error('Geolocation error:', err.message);
-        }
-      );
+    if (!('geolocation' in navigator)) {
+      toast.error('Geolocation is not supported by your browser.');
+      return;
     }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const current = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        };
+        setUserPosition(current);
+        if (role === 'captain' && socket && connected && socket.readyState === WebSocket.OPEN) {
+          socket.send(
+            JSON.stringify({
+              type: 'location_update',
+              data: current,
+            })
+          );
+        }
+      },
+      (err) => {
+        console.error('Geolocation error:', err.message);
+        toast.error('Failed to get location: ' + err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+
     return () => {
+      navigator.geolocation.clearWatch(watchId);
       if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.close();
+        socket.close(1000, 'Map component unmounted.');
       }
     };
-  }, [socket, connected]);
+  }, [socket, connected, role]);
 
+  // Subscribe to WebSocket messages
   useEffect(() => {
     if (!socket || !connected) return;
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'active_captains') {
-        setCaptains(data.data);
-      } else {
-        try {
-          const otherLocation = JSON.parse(event.data);
-          if (!otherLocation.lat || !otherLocation.lng || !otherLocation.id) return;
-          if (
-            userPosition &&
-            otherLocation.lat === userPosition.lat &&
-            otherLocation.lng === userPosition.lng
-          )
-            return;
 
-          setOtherUsers((prev) => {
-            const exists = prev.some((p) => p.id === otherLocation.id);
-            return exists ? prev : [...prev, otherLocation];
-          });
-        } catch (err) {
-          console.error('Invalid WebSocket message:', err.message);
+    const unsubscribe = subscribe((event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'active_captains' && role === 'user') {
+          setCaptains(
+            data.data.map((captain) => ({
+              ...captain,
+              distance: userPosition
+                ? haversineDistance(userPosition, captain.location)
+                : null,
+            }))
+          );
+        } else if (data.type === 'error') {
+          toast.error(`Map error: ${data.message}`);
         }
+      } catch (err) {
+        console.error('Invalid WebSocket message:', err.message);
+        toast.error('Received invalid map update.');
       }
-    };
-  }, [userPosition, socket, connected]);
+    });
 
-  const nearestUsers = useMemo(() => {
+    return () => unsubscribe();
+  }, [socket, connected, subscribe, userPosition, role]);
+
+  const nearestCaptains = useMemo(() => {
     if (!userPosition) return [];
-    return [...otherUsers]
-      .map((u) => ({
-        ...u,
-        distance: haversineDistance(userPosition, u),
-      }))
+    return [...captains]
+      .filter((c) => c.location && c.location.lat && c.location.lng)
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 5);
-  }, [otherUsers, userPosition]);
+  }, [captains, userPosition]);
 
   return (
     <motion.div
@@ -105,7 +115,8 @@ const Map = ({ role }) => {
           </h1>
           <button
             onClick={() => setShowRoutes((prev) => !prev)}
-            className="text-sm px-3 py-1 bg-blue-500 text-white rounded"
+            className="text-sm px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-700"
+            aria-label={showRoutes ? 'Hide routes' : 'Show routes'}
           >
             {showRoutes ? 'Hide' : 'Show'} Routes
           </button>
@@ -124,56 +135,45 @@ const Map = ({ role }) => {
                 attribution='© <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
               />
               <MapZoomToUser userPosition={userPosition} />
-              <Marker position={userPosition}>
+              <Marker
+                position={userPosition}
+                icon={new L.Icon({
+                  iconUrl: role === 'captain' ? '/assets/icons/captain.png' : '/assets/icons/user.png',
+                  iconSize: [32, 32],
+                  iconAnchor: [16, 32],
+                })}
+              >
                 <Popup>{role === 'captain' ? 'You (Captain)' : 'You (User)'}</Popup>
               </Marker>
-              {nearestUsers.map((user, idx) => (
-                <Marker
-                  key={user.id}
-                  position={user}
-                  icon={
-                    new L.Icon({
-                      iconUrl:
-                        'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-red.png',
-                      shadowUrl:
-                        'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
-                    })
-                  }
-                >
-                  <Popup>
-                    Closest User #{idx + 1} <br />
-                    {formatDistance(user.distance)} away
-                  </Popup>
-                </Marker>
-              ))}
-              {captains.map((captain, idx) => (
-                <Marker
-                  key={captain.id}
-                  position={captain.location}
-                  icon={
-                    new L.Icon({
-                      iconUrl: `/assets/icons/${captain.vehicle.vehicleType}.png`,
+              {role === 'user' &&
+                nearestCaptains.map((captain, idx) => (
+                  <Marker
+                    key={captain.id}
+                    position={captain.location}
+                    icon={new L.Icon({
+                      iconUrl: `/assets/icons/${captain.vehicle.vehicleType || 'car'}.png`,
                       iconSize: [32, 32],
                       iconAnchor: [16, 32],
-                    })
-                  }
-                >
-                  <Popup>
-                    Captain ({captain.vehicle.vehicleType})<br />
-                    {captain.vehicle.plate}<br />
-                    {captain.status}
-                  </Popup>
-                </Marker>
-              ))}
+                    })}
+                  >
+                    <Popup>
+                      Captain ({captain.vehicle.vehicleType})<br />
+                      Plate: {captain.vehicle.plate}<br />
+                      Status: {captain.status}<br />
+                      {captain.distance ? formatDistance(captain.distance) : 'Calculating...'} away
+                    </Popup>
+                  </Marker>
+                ))}
               {showRoutes &&
-                nearestUsers.map((user, idx) => (
+                role === 'user' &&
+                nearestCaptains.map((captain, idx) => (
                   <Polyline
-                    key={`route-${user.id}`}
-                    positions={[userPosition, user]}
+                    key={`route-${captain.id}`}
+                    positions={[userPosition, captain.location]}
                     color={`hsl(${idx * 60}, 70%, 50%)`}
                     opacity={0.6}
                   >
-                    <Tooltip>{formatDistance(user.distance)}</Tooltip>
+                    <Popup>{formatDistance(captain.distance)}</Popup>
                   </Polyline>
                 ))}
             </MapContainer>

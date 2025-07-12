@@ -29,10 +29,10 @@ class ErrorBoundary extends React.Component {
             animate={{ opacity: 1, y: 0 }}
             className="text-center z-10 px-8"
           >
-            <div className="relative mb-8">
+            <div className="relative -mb-4 -z-20">
               <div className="absolute inset-0 w-40 h-40 mx-auto rounded-full bg-gradient-to-r from-orange-400 to-red-500 opacity-10 animate-ping"></div>
               <div className="relative bg-white rounded-2xl shadow-xl p-4 mx-auto w-fit">
-                <img src="/assets/images/carbar.png" alt="CarBar logo" className="w-32 h-auto mx-auto" />
+                <img src="/assets/images/carbar.png" alt="CarBar logo" className="w-24 h-auto mx-auto" />
               </div>
             </div>
 

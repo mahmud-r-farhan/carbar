@@ -33,7 +33,7 @@ const auth = async (req, res, next) => {
     }
 
     if (!entity) {
-      logger?.warn?.('Unauthorized: Entity not found');
+      logger.warn('Unauthorized: Entity not found', { userId: decoded._id });
       return res.status(401).json({ message: 'Unauthorized: Entity not found' });
     }
 
@@ -41,7 +41,7 @@ const auth = async (req, res, next) => {
     req.role = decoded.role;
     next();
   } catch (err) {
-    logger?.error?.(`Authentication error: ${err.message}`);
+    logger.error(`Authentication error: ${err.message}`);
     res.status(401).json({ message: `Unauthorized: ${err.message}` });
   }
 };
