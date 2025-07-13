@@ -6,7 +6,7 @@ const logger = require('./config/logger');
 
 const env = cleanEnv(process.env, {
   PORT: num({ default: 3000, desc: 'Server port' }),
-  WS_BASE_URL: str({ desc: 'WebSocket base URL', example: 'wss://your-app.onrender.com' }),
+  WS_BASE_URL: str({ desc: 'WebSocket base URL',}),
 });
 
 const server = http.createServer(app);

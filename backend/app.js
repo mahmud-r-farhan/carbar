@@ -45,8 +45,8 @@ connectRedis();
 // Redis-based rate limiter
 const rateLimiter = new RateLimiterRedis({
   storeClient: redisClient,
-  points: env.RATE_LIMIT_MAX,
-  duration: env.RATE_LIMIT_WINDOW_MS / 1000,
+  points: 100, // Allow 100 requests
+  duration: 900, // Per 15 minutes (900 seconds)
   keyPrefix: 'rate-limit',
 });
 
@@ -66,6 +66,7 @@ app.use(helmet({
 app.use(mongoSanitize());
 app.use(compression());
 app.use(morgan('combined', { stream: logger.stream }));
+/*
 app.use(async (req, res, next) => {
   try {
     await rateLimiter.consume(req.ip);
@@ -75,6 +76,7 @@ app.use(async (req, res, next) => {
     res.status(429).json({ error: 'Too many requests, please try again later' });
   }
 });
+*/
 
 // CORS configuration
 const corsOptions = {
