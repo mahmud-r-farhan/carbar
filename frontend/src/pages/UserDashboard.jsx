@@ -57,7 +57,7 @@ const UserDashboard = () => {
       toast.success('Logged out successfully');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Logout failed');
-    }
+    } 
   };
 
   return (
@@ -85,14 +85,14 @@ const UserDashboard = () => {
                 <p className="text-sm text-gray-600">Ready for your next adventure?</p>
               </div>
             </div>
-            <motion.button
+         {/*   <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleLogout}
               className="bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-2.5 rounded-2xl font-medium shadow-lg hover:shadow-xl transition-all duration-200"
             >
               Logout
-            </motion.button>
+            </motion.button> */}
           </div>
         </div>
       </div>
