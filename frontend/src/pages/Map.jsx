@@ -22,11 +22,11 @@ const MapZoomToUser = ({ userPosition }) => {
 const mapThemes = {
   light: {
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+    attribution: '© <a href="https://www.openstreetmap.org/">CarBar</a> contributors',
   },
   dark: {
     url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '© <a href="https://carto.com/">CARTO</a>',
+    attribution: '© <a href="https://carto.com/">CarBar/a>',
   },
 };
 

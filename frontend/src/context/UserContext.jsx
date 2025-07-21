@@ -24,15 +24,14 @@ const UserContext = ({ children }) => {
         }
 
         const endpoint = userData.role === 'captain' ? '/captain/profile' : '/user/profile';
-        console.log(`Verifying auth with: ${import.meta.env.VITE_API_URL}${endpoint}`);
         const response = await axios.get(`${import.meta.env.VITE_API_URL}${endpoint}`, {
           headers: { Authorization: `Bearer ${userData.token}` },
           withCredentials: true,
           timeout: 5000,
         });
 
-        console.log('Verify auth response:', response.data);
-        const profileData = response.data.user || response.data;
+        // Handle different profile data structures
+        const profileData = userData.role === 'captain' ? (response.data.captain || response.data) : (response.data.user || response.data);
         if (!profileData?._id) {
           throw new Error('Invalid profile data from server');
         }
@@ -50,13 +49,7 @@ const UserContext = ({ children }) => {
 
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
-        console.log('verifyAuth - User verified:', updatedUser);
       } catch (error) {
-        console.error('verifyAuth - Failed:', {
-          message: error.response?.data?.message || error.message,
-          status: error.response?.status,
-          url: error.config?.url,
-        });
         localStorage.removeItem('user');
         setUser(null);
         toast.error(error.response?.data?.message || 'Session expired. Please log in again.');
@@ -70,31 +63,34 @@ const UserContext = ({ children }) => {
   const login = async (email, password, role = 'user') => {
     try {
       const endpoint = role === 'captain' ? '/captain/login' : '/user/login';
-      console.log(`Login request to: ${import.meta.env.VITE_API_URL}${endpoint}`, { email, role });
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}${endpoint}`,
         { email, password },
         { withCredentials: true, timeout: 10000 }
       );
 
-      console.log('Login response:', response.data);
+      // Handle different response structures based on role
+      let userData, token;
+      if (role === 'captain') {
+        userData = response.data.captain;
+        token = response.data.token;
+      } else {
+        userData = response.data.user || response.data;
+        token = response.data.token;
+      }
 
-      const { token, user: userData } = response.data;
       if (!userData?._id || !token) {
         throw new Error('Invalid user data from server: missing _id or token');
       }
 
       const validateEndpoint = role === 'captain' ? '/captain/profile' : '/user/profile';
-      console.log(`Validating token with: ${import.meta.env.VITE_API_URL}${validateEndpoint}`);
       const validateResponse = await axios.get(`${import.meta.env.VITE_API_URL}${validateEndpoint}`, {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true,
         timeout: 5000,
       });
 
-      console.log('Profile validation response:', validateResponse.data);
-
-      const profileData = validateResponse.data.user || validateResponse.data;
+      const profileData = role === 'captain' ? (validateResponse.data.captain || validateResponse.data) : (validateResponse.data.user || validateResponse.data);
       if (!profileData?._id) {
         throw new Error('Token validation failed: invalid profile data');
       }
@@ -112,7 +108,6 @@ const UserContext = ({ children }) => {
 
       setUser(newUser);
       localStorage.setItem('user', JSON.stringify(newUser));
-      console.log('Stored user data:', newUser);
       toast.success('Login successful');
 
       if ('serviceWorker' in navigator && 'PushManager' in window) {
@@ -122,12 +117,6 @@ const UserContext = ({ children }) => {
       return newUser;
     } catch (error) {
       const errorMessage = error.response?.data?.message || error.message || 'An unexpected error occurred';
-      console.error('login - Failed:', {
-        message: errorMessage,
-        status: error.response?.status,
-        url: error.config?.url,
-        data: error.response?.data,
-      });
       if (error.code === 'ECONNABORTED') {
         toast.error('Request timed out. Please check your connection and try again.');
       } else if (error.response?.status === 500) {
@@ -159,8 +148,7 @@ const UserContext = ({ children }) => {
       localStorage.removeItem('user');
       toast.success('Logged out successfully');
     } catch (error) {
-      console.error('logout - Failed:', error.response?.data?.message || error.message);
-      toast.error(error.response?.data?.message || 'Logout failed');
+     toast.error(error.response?.data?.message || 'Logout failed');
     }
   };
 
@@ -192,7 +180,7 @@ const UserContext = ({ children }) => {
         credentials: 'include',
       });
     } catch (err) {
-      console.error('Push subscription failed:', err);
+      // Removed console.error for production
     }
   }
 
