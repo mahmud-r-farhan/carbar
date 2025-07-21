@@ -1,12 +1,12 @@
 import React, { useContext } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
-import UserLogin from './pages/UserLogin';
-import UserSignUp from './pages/UserSignUp';
-import CaptainLogin from './pages/CaptainLogin';
-import CaptainSignup from './pages/CaptainSignup';
-import UserDashboard from './pages/UserDashboard';
-import CaptainDashboard from './pages/CaptainDashboard';
+import UserLogin from './pages/user/UserLogin';
+import UserSignUp from './pages/user/UserSignUp';
+import CaptainLogin from './pages/captain/CaptainLogin';
+import CaptainSignup from './pages/captain/CaptainSignup';
+import UserDashboard from './pages/user/UserDashboard';
+import CaptainDashboard from './pages/captain/CaptainDashboard';
 import Map from './pages/Map';
 import Chat from './pages/Chat';
 import BookRide from './pages/BookRide';

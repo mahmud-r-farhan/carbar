@@ -2,9 +2,9 @@ import React, { useState, useContext } from 'react';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { UserDataContext } from '../context/UserContext';
+import { UserDataContext } from '../../context/UserContext';
 import { Eye, EyeOff } from 'lucide-react';
-import axios from '../services/axios';
+import axios from '../../services/axios';
 
 const CaptainLogin = () => {
   const [email, setEmail] = useState('');

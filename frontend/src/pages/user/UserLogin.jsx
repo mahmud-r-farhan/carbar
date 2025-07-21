@@ -3,8 +3,8 @@ import { toast } from 'sonner';
 import { Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { UserDataContext } from '../context/UserContext';
-import axios from '../services/axios';
+import { UserDataContext } from '../../context/UserContext';
+import axios from '../../services/axios';
 
 const UserLogin = () => {
   const [email, setEmail] = useState('');

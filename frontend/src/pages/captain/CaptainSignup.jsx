@@ -3,9 +3,9 @@ import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion } from 'framer-motion';
-import TermModal from '../components/system/TermModal';
+import TermModal from '../../components/system/TermModal';
 import { Eye, EyeOff } from 'lucide-react';
-import { UserDataContext } from '../context/UserContext';
+import { UserDataContext } from '../../context/UserContext';
 
 const CaptainSignup = () => {
   const [firstName, setFirstName] = useState('');
