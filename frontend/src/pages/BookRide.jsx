@@ -24,7 +24,7 @@ const LocationSelector = ({ onSelect, type }) => {
 };
 
 const BookRide = () => {
-  const [user] = useContext(UserDataContext);
+  const user = useContext(UserDataContext);
   const { setCurrentTripId } = useContext(TripContext);
   const navigate = useNavigate();
   const { socket, connected, subscribe, connect } = useWebSocket();
