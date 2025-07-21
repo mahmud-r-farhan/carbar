@@ -15,17 +15,17 @@ def get_screen_size():
 def main():
     debug = False
     window_title = "CarBar"
-    window_url = "https://carbar-pi.vercel.app/"
+    window_url = "https://carbar-pi.vercel.app"
     resizable = False
 
     screen_width, screen_height = get_screen_size()
 
     if screen_width <= 1366:
-        width = 390
-        height = 844
+        width = 340
+        height = 640
     else:
-        width = 412
-        height = 915
+        width = 400
+        height = 740
 
     left = int((screen_width - width) / 2)
     top = int((screen_height - height) / 2)
@@ -38,7 +38,6 @@ def main():
         x=left,
         y=top,
         resizable=resizable,
-        private_mode=True
     )
 
     webview.start(debug=debug)
