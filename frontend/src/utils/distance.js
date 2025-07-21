@@ -1,4 +1,3 @@
-// utils/distance.js
 export const haversineDistance = (pos1, pos2) => {
   const R = 6371e3; // Earth's radius in meters
   const φ1 = (pos1.lat * Math.PI) / 180;

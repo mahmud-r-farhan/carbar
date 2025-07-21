@@ -10,9 +10,15 @@ const useWebSocket = () => {
   const wsRef = useRef(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
-  const reconnectInterval = useRef(1000);
+  const reconnectInterval = useRef(1000); // Initial reconnect delay in ms
+  const reconnectTimeoutRef = useRef(null);
+  const pingIntervalRef = useRef(null);
 
   const subscribe = (cb) => {
+    if (typeof cb !== 'function') {
+      console.warn('Subscribe callback must be a function');
+      return () => {};
+    }
     listenersRef.current.push(cb);
     return () => {
       listenersRef.current = listenersRef.current.filter((fn) => fn !== cb);
@@ -20,6 +26,7 @@ const useWebSocket = () => {
   };
 
   const connect = () => {
+    // Validate user data
     if (!user?._id || !user?.token || !user?.role) {
       console.warn('Cannot connect to WebSocket: Missing user data', { user });
       setConnected(false);
@@ -28,54 +35,87 @@ const useWebSocket = () => {
       return;
     }
 
+    // Validate WebSocket URL
     const wsUrl = `${import.meta.env.VITE_WS_SERVER_URL}/websocket?token=${user.token}`;
-    if (!import.meta.env.VITE_WS_SERVER_URL || !wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
+    if (!import.meta.env.VITE_WS_SERVER_URL || (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://'))) {
       console.error('Invalid WebSocket URL', { wsUrl });
       toast.error('Invalid WebSocket configuration. Please contact support.');
       return;
     }
 
-    console.log('Attempting WebSocket connection:', wsUrl); // Debug log
+    // Prevent multiple simultaneous connections
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      console.log('WebSocket already connected:', wsUrl);
+      return;
+    }
+
+    console.log('Attempting WebSocket connection:', wsUrl);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
+    setSocket(ws);
 
     ws.onopen = () => {
       setConnected(true);
-      setSocket(ws);
       reconnectAttempts.current = 0;
       reconnectInterval.current = 1000;
       console.log('WebSocket connected:', wsUrl);
-      toast.info('Connected to real-time services');
+      toast.success('Connected to real-time services');
+
+      // Start sending ping messages to keep connection alive
+      pingIntervalRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, 30000); // Ping every 30 seconds
     };
 
     ws.onmessage = (event) => {
-      listenersRef.current.forEach((cb) => cb(event));
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'pong') {
+          console.log('Received pong from server');
+          return;
+        }
+        listenersRef.current.forEach((cb) => cb(event));
+        console.log('WebSocket message received:', data);
+      } catch (err) {
+        console.error('Invalid WebSocket message:', err.message);
+        toast.error('Received invalid server message.');
+      }
     };
 
     ws.onclose = (event) => {
       setConnected(false);
       setSocket(null);
+      clearInterval(pingIntervalRef.current);
       const closeMessages = {
+        1000: 'WebSocket connection closed normally.',
         4001: 'Authentication required. Please log in again.',
         4002: 'Invalid user. Please log in again.',
         4003: 'Authentication failed. Invalid token.',
         4004: 'Server error. Please try again later.',
         4005: 'Invalid message format.',
       };
-      const message = closeMessages[event.code] || 'WebSocket connection closed.';
+      const message = closeMessages[event.code] || `WebSocket closed with code ${event.code}.`;
       console.warn('WebSocket closed:', { code: event.code, reason: event.reason });
       toast.error(message);
-      if (event.code === 4001 || event.code === 4002 || event.code === 4003) {
+
+      // Handle authentication-related closures
+      if ([4001, 4002, 4003].includes(event.code)) {
         localStorage.removeItem('user');
+        return;
       }
+
+      // Attempt reconnection with exponential backoff
       if (reconnectAttempts.current < maxReconnectAttempts) {
-        setTimeout(() => {
+        reconnectTimeoutRef.current = setTimeout(() => {
           reconnectAttempts.current += 1;
-          reconnectInterval.current = Math.min(reconnectInterval.current * 2, 8000); // Cap at 8 seconds
+          reconnectInterval.current = Math.min(reconnectInterval.current * 2, 8000);
           console.log(`Reconnect attempt ${reconnectAttempts.current}/${maxReconnectAttempts}`);
           connect();
-        }, reconnectInterval.current);
+        }, reconnectInterval.current + Math.random() * 100); // Add jitter
       } else {
+        console.error('Max reconnect attempts reached');
         toast.error('Unable to connect to real-time services after multiple attempts.');
       }
     };
@@ -83,25 +123,31 @@ const useWebSocket = () => {
     ws.onerror = (error) => {
       setConnected(false);
       setSocket(null);
+      clearInterval(pingIntervalRef.current);
       console.error('WebSocket error:', error);
       toast.error('WebSocket connection error. Attempting to reconnect...');
-      if (reconnectAttempts.current < maxReconnectAttempts) {
-        setTimeout(() => {
-          reconnectAttempts.current += 1;
-          reconnectInterval.current = Math.min(reconnectInterval.current * 2, 8000);
-          connect();
-        }, reconnectInterval.current);
-      }
     };
   };
 
   useEffect(() => {
-    connect();
+    if (user?._id && user?.token && user?.role) {
+      connect();
+    }
+
     return () => {
-      listenersRef.current = []; // Clear listeners on unmount
+      listenersRef.current = [];
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+      }
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.close(1000, 'Component unmounted');
       }
+      wsRef.current = null;
+      setConnected(false);
+      setSocket(null);
     };
   }, [user?._id, user?.token, user?.role]);
 
