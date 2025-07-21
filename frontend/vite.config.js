@@ -63,13 +63,6 @@ export default defineConfig({
     host: true,
     port: 5173,
     open: true,
-      proxy: {
-        '/user': {
-          target: 'ws://localhost:3000', // Backend WebSocket server
-          ws: true,
-          changeOrigin: true,
-        },
-      },
     },
   build: {
     outDir: 'dist',
