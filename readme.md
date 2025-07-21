@@ -55,7 +55,6 @@ npm install
 
 ```bash
 npm run start
-
 ```
 
 5.  Run the frontend:
@@ -63,8 +62,13 @@ npm run start
 
 ```bash
 npm run dev
-
 ```
 
+## Clone Repo:
 
-## Under-Development
+```
+git clone https://github.com/mahmud-r-farhan/carbar.git
+```
+
+---
+<h3 style="color:red">Under-Development<sup> ;)<sup></h3>
