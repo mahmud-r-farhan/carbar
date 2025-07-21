@@ -11,6 +11,7 @@ const useWebSocket = () => {
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const reconnectInterval = useRef(1000); // Initial reconnect delay in ms
+  const maxReconnectInterval = 8000; // Maximum reconnect delay in ms
   const reconnectTimeoutRef = useRef(null);
   const pingIntervalRef = useRef(null);
 
@@ -43,10 +44,10 @@ const useWebSocket = () => {
       return;
     }
 
-    // Prevent multiple simultaneous connections
+    // Close any existing connection
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      console.log('WebSocket already connected:', wsUrl);
-      return;
+      console.log('Closing existing WebSocket connection:', wsUrl);
+      wsRef.current.close(1000, 'Closing for new connection');
     }
 
     console.log('Attempting WebSocket connection:', wsUrl);
@@ -56,17 +57,22 @@ const useWebSocket = () => {
 
     ws.onopen = () => {
       setConnected(true);
-      reconnectAttempts.current = 0;
-      reconnectInterval.current = 1000;
+      reconnectAttempts.current = 0; // Reset reconnect attempts on successful connection
+      reconnectInterval.current = 1000; // Reset reconnect interval
       console.log('WebSocket connected:', wsUrl);
       toast.success('Connected to real-time services');
 
       // Start sending ping messages to keep connection alive
       pingIntervalRef.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'ping' }));
+          try {
+            ws.send(JSON.stringify({ type: 'ping' }));
+            console.log('Ping sent to server');
+          } catch (err) {
+            console.error('Error sending ping:', err.message);
+          }
         }
-      }, 30000); // Ping every 30 seconds
+      }, 45000); // Ping every 45 seconds to reduce server load
     };
 
     ws.onmessage = (event) => {
@@ -76,7 +82,13 @@ const useWebSocket = () => {
           console.log('Received pong from server');
           return;
         }
-        listenersRef.current.forEach((cb) => cb(event));
+        listenersRef.current.forEach((cb) => {
+          try {
+            cb(event);
+          } catch (err) {
+            console.error('Error in WebSocket listener:', err.message);
+          }
+        });
         console.log('WebSocket message received:', data);
       } catch (err) {
         console.error('Invalid WebSocket message:', err.message);
@@ -96,13 +108,25 @@ const useWebSocket = () => {
         4004: 'Server error. Please try again later.',
         4005: 'Invalid message format.',
       };
-      const message = closeMessages[event.code] || `WebSocket closed with code ${event.code}.`;
+      const message =
+        event.reason === 'New connection established'
+          ? 'WebSocket closed due to new connection.'
+          : closeMessages[event.code] || `WebSocket closed with code ${event.code}.`;
       console.warn('WebSocket closed:', { code: event.code, reason: event.reason });
-      toast.error(message);
+      if (event.reason !== 'New connection established') {
+        toast.error(message);
+      }
 
       // Handle authentication-related closures
       if ([4001, 4002, 4003].includes(event.code)) {
         localStorage.removeItem('user');
+        toast.error('Session expired. Please log in again.');
+        return;
+      }
+
+      // Skip reconnect if closed due to new connection
+      if (event.reason === 'New connection established') {
+        console.log('Skipping reconnect: New connection established.');
         return;
       }
 
@@ -110,7 +134,7 @@ const useWebSocket = () => {
       if (reconnectAttempts.current < maxReconnectAttempts) {
         reconnectTimeoutRef.current = setTimeout(() => {
           reconnectAttempts.current += 1;
-          reconnectInterval.current = Math.min(reconnectInterval.current * 2, 8000);
+          reconnectInterval.current = Math.min(reconnectInterval.current * 2, maxReconnectInterval);
           console.log(`Reconnect attempt ${reconnectAttempts.current}/${maxReconnectAttempts}`);
           connect();
         }, reconnectInterval.current + Math.random() * 100); // Add jitter
@@ -142,10 +166,16 @@ const useWebSocket = () => {
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current);
       }
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.close(1000, 'Component unmounted');
+      if (wsRef.current) {
+        try {
+          if (wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.close(1000, 'Component unmounted');
+          }
+        } catch (err) {
+          console.error('Error closing WebSocket on cleanup:', err.message);
+        }
+        wsRef.current = null;
       }
-      wsRef.current = null;
       setConnected(false);
       setSocket(null);
     };

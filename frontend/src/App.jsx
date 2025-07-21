@@ -15,10 +15,10 @@ import Settings from './pages/Settings';
 import { UserDataContext } from './context/UserContext';
 import UserContext from './context/UserContext';
 import TripContextProvider from './context/TripContext';
-import ProtectedRoute from './components/ProtectedRoute';
-import ErrorBoundary from './components/ErrorBoundary';
+import ProtectedRoute from './components/system/ProtectedRoute';
+import ErrorBoundary from './components/ui/ErrorBoundary';
 import { Toaster } from 'sonner';
-import BottomNav from './components/BottomNav';
+import BottomNav from './components/system/BottomNav';
 import NotFound from './pages/NotFound';
 
 const AppLayout = () => {

@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { UserDataContext } from '../context/UserContext';
-import Loading from '../components/Loading';
+import { UserDataContext } from '../../context/UserContext';
+import Loading from '../ui/Loading';
 import { toast } from 'sonner';
 
 const ProtectedRoute = ({ children, role, roles }) => {

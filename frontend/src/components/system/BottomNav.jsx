@@ -2,7 +2,7 @@ import React, { useContext } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Home, User, MessageCircle, Bell, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { UserDataContext } from '../context/UserContext';
+import { UserDataContext } from '../../context/UserContext';
 
 const getNavItems = (role) => {
   const prefix = role === 'captain' ? '/captain' : '/user';

@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import axios from '../services/axios';
 import { toast } from 'sonner';
-import Loading from '../components/Loading';
+import Loading from '../components/ui/Loading';
 
 export const UserDataContext = createContext();
 
