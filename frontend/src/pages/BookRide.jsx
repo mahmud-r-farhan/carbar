@@ -36,7 +36,7 @@ const BookRide = () => {
   const [step, setStep] = useState(1);
   const [rideType, setRideType] = useState('ride');
   const [pickupLocation, setPickupLocation] = useState(null);
-  const [dropoffLocation, setDropoffLocation] = useState(null); // Renamed for clarity
+  const [dropoffLocation, setDropoffLocation] = useState(null);
   const [amount, setAmount] = useState('');
   const [activeCaptains, setActiveCaptains] = useState([]);
   const [selectedCaptain, setSelectedCaptain] = useState(null);
@@ -46,16 +46,28 @@ const BookRide = () => {
   const [pickupSuggestions, setPickupSuggestions] = useState([]);
   const [dropSuggestions, setDropSuggestions] = useState([]);
   const [activeType, setActiveType] = useState('pickup');
+  const [isLocationLoading, setIsLocationLoading] = useState(true);
 
-  // Reconnect logic with improved backoff
+  // Reconnect logic with exponential backoff
   useEffect(() => {
     if (!connected && user?.token) {
-      const reconnectTimer = setTimeout(() => {
-        console.log('Attempting to reconnect WebSocket...');
-        connect();
-        toast.info('Attempting to reconnect to server...');
-      }, 3000);
-      return () => clearTimeout(reconnectTimer);
+      let attempts = 0;
+      const maxAttempts = 5;
+      const reconnect = () => {
+        if (attempts < maxAttempts) {
+          const delay = Math.min(1000 * 2 ** attempts, 10000); // Exponential backoff
+          const reconnectTimer = setTimeout(() => {
+            console.log(`Reconnect attempt ${attempts + 1}...`);
+            connect();
+            toast.info('Attempting to reconnect to server...');
+            attempts++;
+          }, delay);
+          return () => clearTimeout(reconnectTimer);
+        } else {
+          toast.error('Failed to reconnect after multiple attempts.');
+        }
+      };
+      reconnect();
     }
   }, [connected, user?.token, connect]);
 
@@ -87,9 +99,11 @@ const BookRide = () => {
           case 'trip_request_failed':
             toast.error(`Failed to request trip: ${data.message}`);
             setStep(2);
+            setLoading(false);
             break;
           case 'captain_rejected_trip':
             toast.warning(`Captain rejected your trip. Finding another captain...`);
+            setSelectedCaptain(null);
             break;
           case 'error':
             toast.error(`Error: ${data.message}`);
@@ -104,13 +118,15 @@ const BookRide = () => {
     return () => unsubscribe();
   }, [socket, connected, subscribe, pickupLocation, setCurrentTripId, navigate]);
 
-  // Get initial user location
+  // Get initial user location as pickup location
   useEffect(() => {
     if (!('geolocation' in navigator)) {
-      toast.error('Geolocation is not supported.');
+      toast.error('Geolocation is not supported by your browser.');
+      setIsLocationLoading(false);
       return;
     }
-    navigator.geolocation.getCurrentPosition(
+
+    const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
         fetchAddress(latitude, longitude, (address) => {
@@ -119,19 +135,24 @@ const BookRide = () => {
             address,
           });
           setPickupSearch(address);
+          setIsLocationLoading(false);
+          toast.success('Your current location set as pickup point.');
         });
       },
       (err) => {
         console.error('Geolocation error:', err.message);
         toast.error('Failed to get location: ' + err.message);
+        setIsLocationLoading(false);
       },
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
+
+    return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // Handle address search
+  // Handle address search for pickup
   useEffect(() => {
-    if (pickupSearch) {
+    if (pickupSearch && !isLocationLoading) {
       const debounce = setTimeout(() => {
         searchAddress(pickupSearch, setPickupSuggestions);
       }, 300);
@@ -139,8 +160,9 @@ const BookRide = () => {
     } else {
       setPickupSuggestions([]);
     }
-  }, [pickupSearch]);
+  }, [pickupSearch, isLocationLoading]);
 
+  // Handle address search for dropoff
   useEffect(() => {
     if (dropSearch && pickupLocation) {
       const debounce = setTimeout(() => {
@@ -158,11 +180,13 @@ const BookRide = () => {
       setPickupSearch(address);
       setPickupSuggestions([]);
       setActiveType('dropoff');
+      toast.info('Pickup location updated.');
     } else if (type === 'dropoff') {
       setDropoffLocation({ coordinates: latlng, address });
       setDropSearch(address);
       setDropSuggestions([]);
       setActiveType(null);
+      toast.info('Dropoff location set.');
     }
   };
 
@@ -172,8 +196,16 @@ const BookRide = () => {
   };
 
   const handleSubmit = () => {
-    if (!pickupLocation || !dropoffLocation || !amount || amount <= 0) {
-      toast.error('Please fill all fields with valid values.');
+    if (!pickupLocation) {
+      toast.error('Please set a valid pickup location.');
+      return;
+    }
+    if (!dropoffLocation) {
+      toast.error('Please select a dropoff location.');
+      return;
+    }
+    if (!amount || amount <= 0) {
+      toast.error('Please enter a valid amount.');
       return;
     }
     if (!connected || !socket || socket.readyState !== WebSocket.OPEN) {
@@ -199,7 +231,6 @@ const BookRide = () => {
     } catch (error) {
       console.error('Error sending trip request:', error);
       toast.error('Failed to request ride.');
-    } finally {
       setLoading(false);
     }
   };
@@ -231,6 +262,24 @@ const BookRide = () => {
             </motion.div>
           ))}
         </div>
+
+        {/* Loading Indicator for Initial Location */}
+        {isLocationLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center mb-4"
+          >
+            <div className="flex justify-center items-center">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                className="w-6 h-6 border-4 border-orange-500 border-t-transparent rounded-full mr-2"
+              />
+              <span className="text-gray-600">Fetching your location...</span>
+            </div>
+          </motion.div>
+        )}
 
         {/* Step 1: Ride Type */}
         {step === 1 && (

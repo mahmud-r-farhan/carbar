@@ -10,10 +10,12 @@ const useWebSocket = () => {
   const wsRef = useRef(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
-  const reconnectInterval = useRef(1000); // Initial reconnect delay in ms
-  const maxReconnectInterval = 8000; // Maximum reconnect delay in ms
+  const reconnectInterval = useRef(1000);
+  const maxReconnectInterval = 30000;
   const reconnectTimeoutRef = useRef(null);
   const pingIntervalRef = useRef(null);
+  const isManualClose = useRef(false);
+  const connectionId = useRef(0);
 
   const subscribe = (cb) => {
     if (typeof cb !== 'function') {
@@ -24,6 +26,21 @@ const useWebSocket = () => {
     return () => {
       listenersRef.current = listenersRef.current.filter((fn) => fn !== cb);
     };
+  };
+
+  const disconnect = () => {
+    isManualClose.current = true;
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
+    }
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.close(1000, 'Manual disconnect');
+    }
   };
 
   const connect = () => {
@@ -44,38 +61,70 @@ const useWebSocket = () => {
       return;
     }
 
+    // Don't reconnect if manually closed
+    if (isManualClose.current) {
+      console.log('Skipping connection: manually closed');
+      return;
+    }
+
     // Close any existing connection
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       console.log('Closing existing WebSocket connection:', wsUrl);
       wsRef.current.close(1000, 'Closing for new connection');
     }
 
-    console.log('Attempting WebSocket connection:', wsUrl);
+    // Clear any pending reconnection
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    // Create new connection ID to track this specific connection
+    const currentConnectionId = ++connectionId.current;
+    console.log(`Attempting WebSocket connection (ID: ${currentConnectionId}):`, wsUrl);
+    
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
     setSocket(ws);
+    isManualClose.current = false;
 
     ws.onopen = () => {
+      // Ensure this is still the active connection
+      if (connectionId.current !== currentConnectionId) {
+        console.log('Connection superseded, closing old connection');
+        ws.close();
+        return;
+      }
+
       setConnected(true);
       reconnectAttempts.current = 0; // Reset reconnect attempts on successful connection
       reconnectInterval.current = 1000; // Reset reconnect interval
-      console.log('WebSocket connected:', wsUrl);
+      console.log(`WebSocket connected (ID: ${currentConnectionId}):`, wsUrl);
       toast.success('Connected to real-time services');
 
       // Start sending ping messages to keep connection alive
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+      }
+      
       pingIntervalRef.current = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
+        if (ws.readyState === WebSocket.OPEN && connectionId.current === currentConnectionId) {
           try {
-            ws.send(JSON.stringify({ type: 'ping' }));
+            ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
             console.log('Ping sent to server');
           } catch (err) {
             console.error('Error sending ping:', err.message);
           }
         }
-      }, 45000); // Ping every 45 seconds to reduce server load
+      }, 30000); // Ping every 30 seconds
     };
 
     ws.onmessage = (event) => {
+      // Ensure this is still the active connection
+      if (connectionId.current !== currentConnectionId) {
+        return;
+      }
+
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'pong') {
@@ -97,24 +146,44 @@ const useWebSocket = () => {
     };
 
     ws.onclose = (event) => {
+      // Only handle close for the current connection
+      if (connectionId.current !== currentConnectionId) {
+        return;
+      }
+
       setConnected(false);
       setSocket(null);
-      clearInterval(pingIntervalRef.current);
+      
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
+      }
+
       const closeMessages = {
         1000: 'WebSocket connection closed normally.',
+        1001: 'Going away.',
+        1002: 'Protocol error.',
+        1003: 'Unsupported data type.',
+        1006: 'Connection lost.',
+        1011: 'Server error.',
         4001: 'Authentication required. Please log in again.',
         4002: 'Invalid user. Please log in again.',
         4003: 'Authentication failed. Invalid token.',
         4004: 'Server error. Please try again later.',
         4005: 'Invalid message format.',
       };
-      const message =
-        event.reason === 'New connection established'
-          ? 'WebSocket closed due to new connection.'
-          : closeMessages[event.code] || `WebSocket closed with code ${event.code}.`;
-      console.warn('WebSocket closed:', { code: event.code, reason: event.reason });
-      if (event.reason !== 'New connection established') {
-        toast.error(message);
+
+      const message = closeMessages[event.code] || `WebSocket closed with code ${event.code}.`;
+      console.warn(`WebSocket closed (ID: ${currentConnectionId}):`, { 
+        code: event.code, 
+        reason: event.reason,
+        wasClean: event.wasClean 
+      });
+
+      // Don't show error or reconnect for manual closes
+      if (isManualClose.current || event.reason === 'Manual disconnect' || event.reason === 'Component unmounted') {
+        console.log('Manual close detected, not reconnecting');
+        return;
       }
 
       // Handle authentication-related closures
@@ -124,48 +193,63 @@ const useWebSocket = () => {
         return;
       }
 
-      // Skip reconnect if closed due to new connection
-      if (event.reason === 'New connection established') {
-        console.log('Skipping reconnect: New connection established.');
-        return;
+      // Show error for unexpected closes
+      if (event.code !== 1000 || !event.wasClean) {
+        toast.error(message);
       }
 
-      // Attempt reconnection with exponential backoff
-      if (reconnectAttempts.current < maxReconnectAttempts) {
+      // Only reconnect for unexpected disconnections
+      if (event.code !== 1000 && reconnectAttempts.current < maxReconnectAttempts) {
         reconnectTimeoutRef.current = setTimeout(() => {
-          reconnectAttempts.current += 1;
-          reconnectInterval.current = Math.min(reconnectInterval.current * 2, maxReconnectInterval);
-          console.log(`Reconnect attempt ${reconnectAttempts.current}/${maxReconnectAttempts}`);
-          connect();
-        }, reconnectInterval.current + Math.random() * 100); // Add jitter
-      } else {
+          if (!isManualClose.current && connectionId.current === currentConnectionId) {
+            reconnectAttempts.current += 1;
+            reconnectInterval.current = Math.min(reconnectInterval.current * 2, maxReconnectInterval);
+            console.log(`Reconnect attempt ${reconnectAttempts.current}/${maxReconnectAttempts} (ID: ${currentConnectionId})`);
+            connect();
+          }
+        }, reconnectInterval.current + Math.random() * 1000); // Add jitter
+      } else if (reconnectAttempts.current >= maxReconnectAttempts) {
         console.error('Max reconnect attempts reached');
         toast.error('Unable to connect to real-time services after multiple attempts.');
       }
     };
 
     ws.onerror = (error) => {
-      setConnected(false);
-      setSocket(null);
-      clearInterval(pingIntervalRef.current);
-      console.error('WebSocket error:', error);
-      toast.error('WebSocket connection error. Attempting to reconnect...');
+      // Only handle errors for the current connection
+      if (connectionId.current !== currentConnectionId) {
+        return;
+      }
+
+      console.error(`WebSocket error (ID: ${currentConnectionId}):`, error);
+      
+      // Don't show error toast for manual closes
+      if (!isManualClose.current) {
+        toast.error('WebSocket connection error. Attempting to reconnect...');
+      }
     };
   };
 
   useEffect(() => {
     if (user?._id && user?.token && user?.role) {
       connect();
+    } else {
+      disconnect();
     }
 
     return () => {
+      isManualClose.current = true;
       listenersRef.current = [];
+      
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
       }
+      
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
       }
+      
       if (wsRef.current) {
         try {
           if (wsRef.current.readyState === WebSocket.OPEN) {
@@ -176,12 +260,13 @@ const useWebSocket = () => {
         }
         wsRef.current = null;
       }
+      
       setConnected(false);
       setSocket(null);
     };
   }, [user?._id, user?.token, user?.role]);
 
-  return { socket, connected, subscribe, connect };
+  return { socket, connected, subscribe, connect, disconnect };
 };
 
 export default useWebSocket;
