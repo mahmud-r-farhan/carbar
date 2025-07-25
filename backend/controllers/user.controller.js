@@ -166,19 +166,24 @@ exports.logoutUser = async (req, res, next) => {
 
 exports.getUserRides = async (req, res, next) => {
   try {
-    const trips = await Trip.find({ userId: req.user._id }).populate('captainId', 'fullname vehicle');
+    if (!req.user?._id) {
+      logger.warn('No user found in request');
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    const trips = await Trip.find({ userId: req.user._id }).populate('captainId', 'name vehicle');
     res.status(200).json(
       trips.map((trip) => ({
         id: trip._id,
-        from: trip.from.address,
-        to: trip.to.address,
+        from: trip.from?.address || 'N/A',
+        to: trip.to?.address || 'N/A',
         date: trip.createdAt,
-        status: trip.status,
-        cost: trip.finalAmount || trip.proposedAmount,
-        captain: trip.captainId ? trip.captainId.fullname.firstname : 'N/A',
+        status: trip.status || 'unknown',
+        cost: trip.finalAmount ?? trip.proposedAmount ?? 0,
+        captain: trip.captainId?.name || 'N/A', // Update to match Captain schema
       }))
     );
   } catch (error) {
+    logger.error('Error in getUserRides', { error: error.message, stack: error.stack, userId: req.user?._id });
     next(error);
   }
 };
