@@ -4,6 +4,7 @@ const { sendOTPEmail } = require('../services/email.service');
 const { generateOTP, getOTPExpiration } = require('../utils/otp.util');
 const blacklistTokenModel = require('../models/blacklistToken.model');
 const userModel = require('../models/user.model');
+const logger = require('../config/logger');
 
 exports.registerUser = async (req, res, next) => {
   try {
@@ -179,7 +180,7 @@ exports.getUserRides = async (req, res, next) => {
         date: trip.createdAt,
         status: trip.status || 'unknown',
         cost: trip.finalAmount ?? trip.proposedAmount ?? 0,
-        captain: trip.captainId?.name || 'N/A', // Update to match Captain schema
+        captain: trip.captainId?.name || 'N/A',
       }))
     );
   } catch (error) {

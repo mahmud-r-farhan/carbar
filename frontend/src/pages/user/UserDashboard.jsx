@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserDataContext } from '../../context/UserContext';
 import axios from 'axios';
-import useWebSocket from '../../hooks/useWebSocket';
+import useWebSocketStore from '../../utils/useWebSocketStore';
 
 const UserDashboard = () => {
   const { user, setUser } = useContext(UserDataContext);
@@ -12,7 +12,7 @@ const UserDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
   const navigate = useNavigate();
-  const { socket } = useWebSocket();
+  const subscribeToMessages = useWebSocketStore((state) => state.subscribe);
 
   useEffect(() => {
     const fetchRides = async () => {
@@ -32,8 +32,8 @@ const UserDashboard = () => {
   }, [user.token]);
 
   useEffect(() => {
-    if (socket) {
-      socket.onmessage = (event) => {
+    const unsubscribe = subscribeToMessages((event) => {
+      try {
         const data = JSON.parse(event.data);
         if (data.type === 'trip_accepted') {
           setNotifications((prev) => [
@@ -42,9 +42,13 @@ const UserDashboard = () => {
           ]);
           toast.success('A captain accepted your ride!');
         }
-      };
-    }
-  }, [socket]);
+      } catch (err) {
+        console.error('Error parsing WebSocket message:', err);
+      }
+    });
+
+    return unsubscribe;
+  }, [subscribeToMessages]);
 
   const handleLogout = async () => {
     try {

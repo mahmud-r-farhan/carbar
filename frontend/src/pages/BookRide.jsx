@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { UserDataContext } from '../context/UserContext';
 import { TripContext } from '../context/TripContext';
-import useWebSocket from '../hooks/useWebSocket';
+import useWebSocketStore from '../utils/useWebSocketStore';
 import RideTypeSelector from '../components/bookRide/RideTypeSelector';
 import MapView from '../components/bookRide/MapView';
 import LocationForm from '../components/bookRide/LocationForm';
@@ -32,7 +32,15 @@ const BookRide = () => {
   const { user } = useContext(UserDataContext);
   const { setCurrentTripId } = useContext(TripContext);
   const navigate = useNavigate();
-  const { socket, connected, subscribe, connect } = useWebSocket();
+  
+  // Zustand WebSocket store
+  const connected = useWebSocketStore((state) => state.connected);
+  const socket = useWebSocketStore((state) => state.socket);
+  const subscribe = useWebSocketStore((state) => state.subscribe);
+  const connect = useWebSocketStore((state) => state.connect);
+  const send = useWebSocketStore((state) => state.send);
+  const getConnectionInfo = useWebSocketStore((state) => state.getConnectionInfo);
+  
   const [step, setStep] = useState(1);
   const [rideType, setRideType] = useState('ride');
   const [pickupLocation, setPickupLocation] = useState(null);
@@ -48,75 +56,126 @@ const BookRide = () => {
   const [activeType, setActiveType] = useState('pickup');
   const [isLocationLoading, setIsLocationLoading] = useState(true);
 
-  // Reconnect logic with exponential backoff
+  // Auto-connect when user is available
+  useEffect(() => {
+    if (user?._id && user?.token && user?.role) {
+      connect(user);
+    }
+  }, [user?._id, user?.token, user?.role, connect]);
+
+  // Enhanced reconnect logic with exponential backoff
   useEffect(() => {
     if (!connected && user?.token) {
       let attempts = 0;
       const maxAttempts = 5;
-      const reconnect = () => {
+      let reconnectTimer;
+
+      const attemptReconnect = () => {
         if (attempts < maxAttempts) {
           const delay = Math.min(1000 * 2 ** attempts, 10000); // Exponential backoff
-          const reconnectTimer = setTimeout(() => {
+          
+          reconnectTimer = setTimeout(() => {
             console.log(`Reconnect attempt ${attempts + 1}...`);
-            connect();
-            toast.info('Attempting to reconnect to server...');
+            connect(user);
+            toast.info(`Attempting to reconnect... (${attempts + 1}/${maxAttempts})`);
             attempts++;
+            
+            // Check connection after attempt
+            setTimeout(() => {
+              const info = getConnectionInfo();
+              if (!info.connected && attempts < maxAttempts) {
+                attemptReconnect();
+              } else if (attempts >= maxAttempts) {
+                toast.error('Failed to reconnect after multiple attempts. Please refresh the page.');
+              }
+            }, 2000);
           }, delay);
-          return () => clearTimeout(reconnectTimer);
-        } else {
-          toast.error('Failed to reconnect after multiple attempts.');
         }
       };
-      reconnect();
+
+      attemptReconnect();
+
+      return () => {
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+        }
+      };
     }
-  }, [connected, user?.token, connect]);
+  }, [connected, user, connect, getConnectionInfo]);
 
   // Subscribe to WebSocket messages
   useEffect(() => {
-    if (!socket || !connected) return;
+    if (!connected) return;
 
     const unsubscribe = subscribe((event) => {
       try {
         const data = JSON.parse(event.data);
+        console.log('WebSocket message received:', data);
+
         switch (data.type) {
           case 'active_captains':
-            setActiveCaptains(
-              data.data.map((captain) => ({
-                ...captain,
-                distance: pickupLocation
-                  ? formatDistance(haversineDistance(pickupLocation.coordinates, captain.location))
-                  : 'Unknown',
-              }))
-            );
+            const captainsWithDistance = data.data.map((captain) => ({
+              ...captain,
+              distance: pickupLocation
+                ? formatDistance(haversineDistance(pickupLocation.coordinates, captain.location))
+                : 'Unknown',
+            }));
+            setActiveCaptains(captainsWithDistance);
+            console.log('Active captains updated:', captainsWithDistance.length);
             break;
+
           case 'trip_accepted':
             setCurrentTripId(data.data.tripId);
             toast.success(
-              `Trip accepted by Captain ${data.data.captainInfo.fullname.firstname}! Amount: $${data.data.finalAmount}`
+              `Trip accepted by Captain ${data.data.captainInfo.fullname.firstname}! Amount: $${data.data.finalAmount}`,
+              { duration: 5000 }
             );
             navigate('/chat');
             break;
+
           case 'trip_request_failed':
             toast.error(`Failed to request trip: ${data.message}`);
             setStep(2);
             setLoading(false);
             break;
+
           case 'captain_rejected_trip':
             toast.warning(`Captain rejected your trip. Finding another captain...`);
             setSelectedCaptain(null);
             break;
+
+          case 'no_captains_available':
+            toast.error('No captains available in your area. Please try again later.');
+            setStep(2);
+            setLoading(false);
+            break;
+
+          case 'trip_timeout':
+            toast.warning('Trip request timed out. Please try again.');
+            setStep(2);
+            setLoading(false);
+            break;
+
           case 'error':
             toast.error(`Error: ${data.message}`);
+            if (data.code === 'AUTHENTICATION_FAILED') {
+              // Handle authentication errors
+              localStorage.removeItem('user');
+              navigate('/login');
+            }
             break;
+
+          default:
+            console.log('Unhandled message type:', data.type);
         }
       } catch (err) {
-        console.error('Invalid WebSocket message:', err.message);
+        console.error('Error parsing WebSocket message:', err.message);
         toast.error('Received invalid server message.');
       }
     });
 
-    return () => unsubscribe();
-  }, [socket, connected, subscribe, pickupLocation, setCurrentTripId, navigate]);
+    return unsubscribe;
+  }, [connected, subscribe, pickupLocation, setCurrentTripId, navigate]);
 
   // Get initial user location as pickup location
   useEffect(() => {
@@ -208,31 +267,41 @@ const BookRide = () => {
       toast.error('Please enter a valid amount.');
       return;
     }
-    if (!connected || !socket || socket.readyState !== WebSocket.OPEN) {
-      toast.error('Not connected to server. Retrying...');
-      connect();
+    
+    const connectionInfo = getConnectionInfo();
+    if (!connectionInfo.connected) {
+      toast.error('Not connected to server. Reconnecting...');
+      connect(user);
       return;
     }
+
     setLoading(true);
+    
     try {
-      socket.send(
-        JSON.stringify({
-          type: 'trip_request',
-          data: {
-            origin: pickupLocation,
-            destination: dropoffLocation,
-            proposedAmount: parseFloat(amount),
-            vehicleType: rideType,
-          },
-        })
-      );
-      toast.success('Ride request sent! Waiting for captains...');
+      const tripRequest = {
+        type: 'trip_request',
+        data: {
+          origin: pickupLocation,
+          destination: dropoffLocation,
+          proposedAmount: parseFloat(amount),
+          vehicleType: rideType,
+          timestamp: Date.now()
+        },
+      };
+
+      send(tripRequest);
+      toast.success('Ride request sent! Waiting for captains...', { duration: 3000 });
       setStep(3);
     } catch (error) {
       console.error('Error sending trip request:', error);
-      toast.error('Failed to request ride.');
+      toast.error('Failed to request ride. Please try again.');
       setLoading(false);
     }
+  };
+
+  const handleRetryConnection = () => {
+    toast.info('Attempting to reconnect...');
+    connect(user);
   };
 
   return (
@@ -246,13 +315,37 @@ const BookRide = () => {
         transition={{ duration: 0.5 }}
         className="relative z-10 w-full max-w-5xl bg-white/90 backdrop-blur-xl rounded-3xl shadow-xl border border-white/30 p-8"
       >
+        {/* Connection Status */}
+        {!connected && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded-xl flex items-center justify-between"
+          >
+            <div className="flex items-center">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                className="w-4 h-4 border-2 border-yellow-500 border-t-transparent rounded-full mr-2"
+              />
+              <span className="text-yellow-800 text-sm">Connecting to server...</span>
+            </div>
+            <button
+              onClick={handleRetryConnection}
+              className="px-3 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm transition-colors"
+            >
+              Retry
+            </button>
+          </motion.div>
+        )}
+
         {/* Step Indicators */}
         <div className="flex justify-between mb-8 bg-white/50 rounded-2xl shadow p-4">
           {['Ride Type', 'Locations', 'Waiting'].map((label, idx) => (
             <motion.div
               key={label}
               whileHover={{ scale: 1.05 }}
-              className={`flex-1 text-center p-3 rounded-xl text-sm font-semibold ${
+              className={`flex-1 text-center p-3 rounded-xl text-sm font-semibold transition-all ${
                 step === idx + 1
                   ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
                   : 'bg-gray-100/50 text-gray-600'
@@ -309,7 +402,7 @@ const BookRide = () => {
               pickupLocation={pickupLocation}
               dropoffLocation={dropoffLocation}
               connected={connected}
-              connect={connect}
+              connect={() => connect(user)}
               loading={loading}
               handleSubmit={handleSubmit}
             />
@@ -323,7 +416,7 @@ const BookRide = () => {
             selectedCaptain={selectedCaptain}
             setSelectedCaptain={setSelectedCaptain}
             connected={connected}
-            connect={connect}
+            connect={() => connect(user)}
           />
         )}
 

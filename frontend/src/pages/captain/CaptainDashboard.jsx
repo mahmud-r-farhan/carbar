@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { UserDataContext } from '../../context/UserContext';
 import axios from 'axios';
-import useWebSocket from '../../hooks/useWebSocket';
+import useWebSocketStore from '../../utils/useWebSocketStore';
 
 const CaptainDashboard = () => {
   const { user, setUser } = useContext(UserDataContext);
@@ -13,7 +13,8 @@ const CaptainDashboard = () => {
   const [status, setStatus] = useState('inactive');
   const [notifications, setNotifications] = useState([]);
   const navigate = useNavigate();
-  const { socket } = useWebSocket();
+  const subscribeToMessages = useWebSocketStore((state) => state.subscribe);
+  const { connected, send } = useWebSocketStore((state) => ({ connected: state.connected, send: state.send }));
 
   useEffect(() => {
     const fetchTrips = async () => {
@@ -33,8 +34,8 @@ const CaptainDashboard = () => {
   }, [user.token]);
 
   useEffect(() => {
-    if (socket) {
-      socket.onmessage = (event) => {
+    const unsubscribe = subscribeToMessages((event) => {
+      try {
         const data = JSON.parse(event.data);
         if (data.type === 'new_trip_request') {
           setNotifications((prev) => [
@@ -43,9 +44,13 @@ const CaptainDashboard = () => {
           ]);
           toast.info('New ride request received!');
         }
-      };
-    }
-  }, [socket]);
+      } catch (err) {
+        console.error('Error parsing WebSocket message:', err);
+      }
+    });
+
+    return unsubscribe;
+  }, [subscribeToMessages]);
 
   const handleLogout = async () => {
     try {
@@ -64,8 +69,8 @@ const CaptainDashboard = () => {
   const toggleStatus = () => {
     const newStatus = status === 'active' ? 'inactive' : 'active';
     setStatus(newStatus);
-    if (socket && socket.readyState === 1) {
-      socket.send(JSON.stringify({ type: 'status_update', data: { status: newStatus } }));
+    if (connected) {
+      send({ type: 'status_update', data: { status: newStatus } });
     }
   };
 

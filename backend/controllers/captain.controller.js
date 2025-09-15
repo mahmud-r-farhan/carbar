@@ -1,7 +1,7 @@
 const { validationResult } = require('express-validator');
 const captainService = require('../services/captain.services');
 const { sendOTPEmail } = require('../services/email.service');
-const { clients, activeCaptains } = require('../services/websocket.service');
+const { clients, activeCaptains } = require('../ws/websocket.service');
 const { generateOTP, getOTPExpiration } = require('../utils/otp.util');
 const blacklistTokenModel = require('../models/blacklistToken.model');
 const captainModel = require('../models/captain.model');

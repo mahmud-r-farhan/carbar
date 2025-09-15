@@ -2,22 +2,24 @@ import React, { useState, useContext, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { TripContext } from '../context/TripContext';
 import { UserDataContext } from '../context/UserContext';
-import useWebSocket from '../hooks/useWebSocket';
+import useWebSocketStore from '../utils/useWebSocketStore';
 import { X } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const Notification = ({ role }) => {
   const { currentTripId } = useContext(TripContext);
   const { user } = useContext(UserDataContext);
-  const { subscribe, connected, connect } = useWebSocket();
+  const subscribe = useWebSocketStore((state) => state.subscribe);
+  const connected = useWebSocketStore((state) => state.connected);
+  const connect = useWebSocketStore((state) => state.connect);
   const [notifications, setNotifications] = useState([]);
   const unsubRef = useRef(null);
 
   useEffect(() => {
     if (user?.socketId) {
-      connect();
+      connect(user);
     }
-  }, [user?.socketId]);
+  }, [user?.socketId, connect]);
 
   useEffect(() => {
     if (!connected) {

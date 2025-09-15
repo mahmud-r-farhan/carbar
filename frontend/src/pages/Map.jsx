@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, ZoomControl }
 import { motion } from 'framer-motion';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import useWebSocket from '../hooks/useWebSocket';
+import useWebSocketStore from '../utils/useWebSocketStore';
 import { formatDistance, haversineDistance } from '../utils/distance';
 import { toast } from 'sonner';
 
@@ -35,7 +35,10 @@ const Map = ({ role }) => {
   const [captains, setCaptains] = useState([]);
   const [showRoutes, setShowRoutes] = useState(true);
   const [mapTheme, setMapTheme] = useState('light');
-  const { socket, connected, subscribe } = useWebSocket();
+  const connected = useWebSocketStore((state) => state.connected);
+  const subscribe = useWebSocketStore((state) => state.subscribe);
+  const send = useWebSocketStore((state) => state.send);
+  const disconnect = useWebSocketStore((state) => state.disconnect);
   const user = JSON.parse(localStorage.getItem('user'));
 
   // Get user location with debounced updates
@@ -59,17 +62,13 @@ const Map = ({ role }) => {
         const now = Date.now();
         if (
           role === 'captain' &&
-          socket &&
           connected &&
-          socket.readyState === WebSocket.OPEN &&
           now - lastSent > 5000 // Debounce: send every 5 seconds
         ) {
-          socket.send(
-            JSON.stringify({
-              type: 'location_update',
-              data: current,
-            })
-          );
+          send({
+            type: 'location_update',
+            data: current,
+          });
           lastSent = now;
         }
       },
@@ -85,15 +84,13 @@ const Map = ({ role }) => {
 
     return () => {
       navigator.geolocation.clearWatch(watchId);
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.close(1000, 'Map component unmounted.');
-      }
+      disconnect();
     };
-  }, [socket, connected, role]);
+  }, [connected, role, send, disconnect]);
 
   // Subscribe to WebSocket messages
   useEffect(() => {
-    if (!socket || !connected) return;
+    if (!connected) return;
 
     const unsubscribe = subscribe((event) => {
       try {
@@ -123,7 +120,7 @@ const Map = ({ role }) => {
     });
 
     return () => unsubscribe();
-  }, [socket, connected, subscribe, userPosition, role]);
+  }, [connected, subscribe, userPosition, role]);
 
   const nearestCaptains = useMemo(() => {
     if (!userPosition) return [];

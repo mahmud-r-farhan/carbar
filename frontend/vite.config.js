@@ -10,7 +10,11 @@ export default defineConfig({
       devOptions: {
         enabled: false,
       },
-      includeAssets: ['/assets/images/logo.png', '/assets/images/logo.png', '/assets/images/logo.png'],
+      includeAssets: [
+        '/assets/images/logo.png',
+        '/assets/images/logo.png',
+        '/assets/images/logo.png',
+      ],
       manifest: {
         name: 'CarBar',
         short_name: 'CarBar',
@@ -63,7 +67,13 @@ export default defineConfig({
     host: true,
     port: 5173,
     open: true,
+    proxy: {
+      '/websocket': {
+        target: process.env.VITE_WS_SERVER_URL,
+        ws: true,
+      },
     },
+  },
   build: {
     outDir: 'dist',
     chunkSizeWarningLimit: 600,

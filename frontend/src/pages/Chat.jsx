@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { UserDataContext } from '../context/UserContext';
 import { TripContext } from '../context/TripContext';
-import useWebSocket from '../hooks/useWebSocket';
+import useWebSocketStore from '../utils/useWebSocketStore';
 import { v4 as uuidv4 } from 'uuid';
 
 const Chat = ({ role }) => {
@@ -13,7 +13,10 @@ const Chat = ({ role }) => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [availableTrips, setAvailableTrips] = useState([]);
-  const { socket, subscribe, connected, connect } = useWebSocket();
+  const connected = useWebSocketStore((state) => state.connected);
+  const subscribe = useWebSocketStore((state) => state.subscribe);
+  const connect = useWebSocketStore((state) => state.connect);
+  const send = useWebSocketStore((state) => state.send);
   const chatWindowRef = useRef(null);
   const unsubRef = useRef(null);
   const pendingMessages = useRef(new Map());
@@ -85,7 +88,7 @@ const Chat = ({ role }) => {
     if (!connected && user?.token && currentTripId) {
       const reconnectTimer = setTimeout(() => {
         console.log('Attempting to reconnect WebSocket...');
-        connect();
+        connect(user);
         toast.info('Attempting to reconnect to chat...');
       }, 5000);
       return () => clearTimeout(reconnectTimer);
@@ -94,7 +97,7 @@ const Chat = ({ role }) => {
 
   // WebSocket subscription
   useEffect(() => {
-    if (!socket || !connected || !currentTripId) {
+    if (!connected || !currentTripId) {
       if (unsubRef.current) {
         unsubRef.current();
         unsubRef.current = null;
@@ -141,7 +144,7 @@ const Chat = ({ role }) => {
         unsubRef.current = null;
       }
     };
-  }, [socket, connected, currentTripId, subscribe, setCurrentTripId]);
+  }, [connected, currentTripId, subscribe, setCurrentTripId]);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -153,9 +156,9 @@ const Chat = ({ role }) => {
       toast.error('No active trip selected for chat.');
       return;
     }
-    if (!connected || !socket || socket.readyState !== WebSocket.OPEN) {
+    if (!connected) {
       toast.error('Not connected to real-time service. Retrying...');
-      connect();
+      connect(user);
       return;
     }
 
@@ -172,12 +175,10 @@ const Chat = ({ role }) => {
     setNewMessage('');
 
     try {
-      socket.send(
-        JSON.stringify({
-          type: 'chat_message',
-          data: { tripId: currentTripId, message: messageObj.text },
-        })
-      );
+      send({
+        type: 'chat_message',
+        data: { tripId: currentTripId, message: messageObj.text },
+      });
     } catch (error) {
       console.error('Failed to send message:', error);
       toast.error('Failed to send message.');
@@ -241,7 +242,7 @@ const Chat = ({ role }) => {
             </select>
             {!connected && (
               <button
-                onClick={() => connect()}
+                onClick={() => connect(user)}
                 className="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
                 aria-label="Reconnect to chat"
               >
