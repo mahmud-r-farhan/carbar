@@ -1,70 +1,86 @@
-# CarBar - Desktop App
+# CarBar Electron App
 
-A lightweight desktop wrapper for the [CarBar web app](https://carbar-pi.vercel.app/) using Python and PyWebview.
-
-## Features
-
-* Automatically adjusts window size based on screen resolution.
-* Opens centered on the screen.
-* Non-resizable window for consistent UX.
-* Private browsing mode enabled.
-* Cross-platform support (Windows-specific screen resolution logic).
+## Overview
+CarBar is a simple Electron-based desktop application that opens a predefined URL (`https://carbar-pi.vercel.app`) inside a non-resizable, centered browser window. The window size dynamically adjusts based on the screen resolution.
 
 ---
 
-## Requirements
 
-* Python 3.x
-* [pywebview](https://pywebview.flowrl.com/)
-* pyinstaller
+## Project Structure
 
----
-
-## Install Dependencies
-
-```bash
-pip install pywebview pyinstaller
 ```
-
-> On Windows, you may also need the `pywin32` package:
-
-```bash
-pip install pywin32
+carbar-electron/
+├── main.js           # Main Electron process script
+├── package.json      # Project configuration & dependencies
+├── icon.ico          # Windows icon file (for packaging)
+├── icon.icns         # macOS icon file (for packaging)
+└── ...               # Other files (optional)
 ```
 
 ---
 
-## Building the Executable
+## Development
 
-Make sure your script is named `main.py` and the icon file `logo-512.ico` is in the same directory.
-
-### Build Command
+### Run the app in development mode:
 
 ```bash
-pyinstaller --onefile --windowed --name CARBAR --icon=logo-512.ico main.py
+npm start
 ```
 
-* `--onefile`: Bundle everything into a single executable.
-* `--windowed`: Hide the terminal window (GUI mode).
-* `--name`: Name of the output executable (`CARBAR.exe` on Windows).
-* `--icon`: Path to the icon file for the app.
+This launches the Electron app in a window loading the target URL.
 
 ---
 
-## Running the App
+## Building the App (Packaging)
 
-After building, you can find the executable in the `dist/` directory:
+CarBar uses [Electron Builder](https://www.electron.build/) to package the app into platform-specific executables.
 
-```bash
-cd dist
-./CARBAR  # On Windows: CARBAR.exe
-```
+### 1. Ensure your icon files are ready:
+
+* `icon.ico` for Windows
+* `icon.icns` for macOS
+* `icon.png` for Linux (optional)
+
+Place these icons in the root project folder.
 
 ---
 
-## Notes
+### 2. Build commands
 
-* Screen resolution detection currently only supports Windows for DPI-aware scaling.
-* On non-Windows systems, a default resolution of 1920×1080 is assumed.
+Use the following commands depending on your target platform:
+
+| Platform | Command                   | Output                 |
+| -------- | ------------------------- | ---------------------- |
+| Windows  | `npm run dist -- --win`   | `.exe` installer & app |
+| macOS    | `npm run dist -- --mac`   | `.dmg` installer       |
+| Linux    | `npm run dist -- --linux` | `.deb` or `.AppImage`  |
+
+---
+
+### 3. Example - Build for Windows:
+
+```bash
+npm run dist -- --win
+```
+
+After building, check the `/dist` folder for your packaged app installer and executable.
+
+---
+
+## Scripts in `package.json`
+
+| Script  | Description                  |
+| ------- | ---------------------------- |
+| `start` | Run the app in development   |
+| `dist`  | Package app for distribution |
+
+---
+
+## Configuration (in `package.json`)
+
+* **appId**: Unique app identifier (`com.carbar.app`)
+* **productName**: App name shown in installer and menus
+* **icon**: Path to app icon for different platforms
+* **files**: Files included in the packaged app
 
 ---
